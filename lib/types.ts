@@ -1,0 +1,146 @@
+export type UserRole = 'superadmin' | 'restaurant'
+export type AccountStatus = 'active' | 'passive' | 'pending_activation'
+
+export interface UserAccount {
+  id: string
+  name: string
+  email: string
+  role: UserRole
+  status: AccountStatus
+  password?: string
+  restaurantId?: string
+  restaurantName?: string
+  phone?: string
+  city?: string
+  createdAt: string
+  lastLogin?: string
+  activationToken?: string
+}
+
+export type ProductTag = 
+  | 'vegan' 
+  | 'vegetarian' 
+  | 'gluten_free' 
+  | 'spicy' 
+  | 'chef_choice' 
+  | 'popular' 
+  | 'discount'
+
+export interface ProductVariation {
+  id: string
+  name: string
+  price: string
+}
+
+export interface MenuItem {
+  id: string
+  name: string
+  description: string
+  price: string
+  image_url: string
+  calories?: number
+  allergens?: string[]
+  macros?: {
+    protein: number
+    carbs: number
+    fat: number
+  }
+  tags?: ProductTag[]
+  variations?: ProductVariation[]
+  display_order: number
+  is_available: boolean
+  is_featured?: boolean
+}
+
+export interface MenuCategory {
+  id: string
+  name: string
+  description?: string
+  display_order: number
+  is_active: boolean
+  items: MenuItem[]
+}
+
+export interface Menu {
+  id: string
+  name: string
+  description: string
+  image_url: string
+  is_listed: boolean
+  available_days: number[]
+  start_time?: string
+  end_time?: string
+  layout: 'grid' | 'list'
+  created_at: string
+  updated_at: string
+  categories: MenuCategory[]
+}
+
+export interface QRCodeData {
+  id: string
+  name?: string
+  table_number?: string
+  area?: string
+  qr_url?: string
+  created_at: string
+  last_regenerated_at?: string
+  scans_count?: number
+  views?: number
+  menu_id?: string
+  menu: {
+    name: string
+    organization: {
+      subdomain: string
+    }
+  }
+}
+
+export interface WaiterCall {
+  id: string
+  table_number: string
+  type: 'bill' | 'waiter' | 'water' | 'other'
+  note?: string
+  created_at: string
+  status: 'pending' | 'resolved'
+}
+
+export interface Restaurant {
+  id: string
+  name: string
+  subdomain: string
+  currency: string
+  status: AccountStatus
+  role?: string
+  ownerName?: string
+  activationToken?: string
+  createdAt?: string
+  tables?: any[]
+  credentials?: {
+    email: string
+    password?: string
+  }
+  businessInfo?: {
+    owner_name?: string
+    email?: string
+    phone?: string
+    city?: string
+    address?: string
+    state?: string
+    zipcode?: string
+    wifi_name?: string
+    wifi_password?: string
+    instagramHandle?: string
+    whatsappNumber?: string
+    googleMapsUrl?: string
+    googleReviewUrl?: string
+    workingHours?: string
+    hours?: any
+  }
+  branding?: {
+    primaryColor?: string
+    logoUrl?: string
+    bannerUrl?: string
+    coverUrl?: string
+    currency?: string
+  }
+}
