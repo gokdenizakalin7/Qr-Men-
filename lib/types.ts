@@ -39,6 +39,7 @@ export interface MenuItem {
   price: string
   image_url: string
   calories?: number
+  calorie_source?: 'auto' | 'manual' | 'detailed'
   allergens?: string[]
   macros?: {
     protein: number

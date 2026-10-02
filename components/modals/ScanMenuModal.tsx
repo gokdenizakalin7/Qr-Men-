@@ -33,6 +33,7 @@ interface ParsedCategory {
 interface ParsedItem {
   name: string
   price: string
+  calories?: number
 }
 
 type Step = 'upload' | 'scanning' | 'results'
@@ -59,6 +60,9 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
   const [isDragging, setIsDragging] = useState(false)
   const [dailyScansUsed, setDailyScansUsed] = useState(0)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [calorieProgress, setCalorieProgress] = useState(0)
+  const [isEstimatingCalories, setIsEstimatingCalories] = useState(false)
+  const [calorieStatus, setCalorieStatus] = useState('')
 
   // Aktif kullanıcı rolünü kontrol et (Admin ve Süper Admin için tarama limiti yoktur)
   useEffect(() => {
@@ -106,6 +110,9 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
     setParsedCategories([])
     setError(null)
     setMenuName('Taranan Menü')
+    setCalorieProgress(0)
+    setIsEstimatingCalories(false)
+    setCalorieStatus('')
   }
 
   const handleClose = () => {
@@ -221,12 +228,13 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
         return
       }
 
-      // Fiyatları normalize et (null ise "")
+      // Fiyatları normalize et (null ise "") ve kalorileri aktar
       const formattedCategories = result.categories.map((c: any) => ({
         name: c.name || 'Genel',
         items: (c.items || []).map((i: any) => ({
           name: i.name || '',
-          price: i.price ? String(i.price) : ''
+          price: i.price ? String(i.price) : '',
+          calories: typeof i.calories === 'number' ? i.calories : (parseInt(i.calories) || undefined)
         }))
       }))
 
@@ -244,6 +252,8 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
       if (result.menuName && result.menuName !== 'Taranan Menü') {
         setMenuName(result.menuName)
       }
+      setParsedCategories(formattedCategories)
+
       setParsedCategories(formattedCategories)
       setStep('results')
     } catch (err: any) {
@@ -322,6 +332,7 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
           description: '',
           price: item.price,
           image_url: '',
+          calories: item.calories || undefined,
           display_order: itemIdx + 1,
           is_available: true
         }))
@@ -571,7 +582,9 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
                   </div>
 
                   <p className="text-sm text-gray-500 text-center max-w-sm">
-                    Gelişmiş Vision modeli menünüzdeki tüm sütunları, kategorileri ve ürünleri analiz ediyor...
+                    {isEstimatingCalories 
+                      ? `${calorieStatus || 'Kaloriler hesaplanıyor...'}`
+                      : 'Gelişmiş Vision modeli menünüzdeki tüm sütunları, kategorileri ve ürünleri analiz ediyor...'}
                   </p>
                 </div>
               </motion.div>
@@ -648,6 +661,15 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
                               className="h-7 text-sm border-0 bg-transparent shadow-none px-1 flex-1 focus-visible:ring-1"
                               placeholder="Ürün adı"
                             />
+                            {item.calories ? (
+                              <span className="text-[10px] text-orange-600 font-bold bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100 whitespace-nowrap flex items-center gap-0.5">
+                                🔥 {item.calories} kcal
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 whitespace-nowrap">
+                                — kcal
+                              </span>
+                            )}
                             <Input
                               value={item.price}
                               onChange={(e) => updateItemPrice(catIdx, itemIdx, e.target.value)}

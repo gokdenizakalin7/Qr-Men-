@@ -264,6 +264,15 @@ export function LiveMenuEditor() {
   const [isCompressingPhoto, setIsCompressingPhoto] = useState(false)
   const [compressedPhotoInfo, setCompressedPhotoInfo] = useState<string | null>(null)
 
+  // AI KALORİ TAHMİNİ STATE'LERİ
+  const [isEstimatingCalories, setIsEstimatingCalories] = useState(false)
+  const [calorieSource, setCalorieSource] = useState<'auto' | 'manual' | 'detailed'>('manual')
+  const [showDetailedCalorie, setShowDetailedCalorie] = useState(false)
+  const [ingredientText, setIngredientText] = useState('')
+  const [isDetailedEstimating, setIsDetailedEstimating] = useState(false)
+  const [calorieNote, setCalorieNote] = useState('')
+  const [calorieError, setCalorieError] = useState('')
+
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // ÖNEMLİ-1: Debounce localStorage writes to prevent main thread blocking on every keystroke
@@ -360,6 +369,65 @@ export function LiveMenuEditor() {
     }
   }
 
+  // AI KALORİ TAHMİN FONKSİYONLARI
+  const handleEstimateCalories = async () => {
+    if (!itemName || itemName.trim().length < 2) return
+    setIsEstimatingCalories(true)
+    setCalorieError('')
+    try {
+      const res = await fetch('/api/estimate-calories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'quick',
+          itemName: itemName.trim(),
+          categoryHint: targetCategoryObj?.name || ''
+        })
+      })
+      const data = await res.json()
+      if (data.success && data.calories) {
+        setItemCalories(String(data.calories))
+        setCalorieSource('auto')
+        setCalorieNote(data.note || '')
+      } else {
+        setCalorieError(data.error || 'Kalori hesaplanamadı.')
+      }
+    } catch {
+      setCalorieError('Bağlantı hatası. Lütfen tekrar deneyin.')
+    }
+    setIsEstimatingCalories(false)
+  }
+
+  const handleDetailedEstimate = async () => {
+    if (!itemName || !ingredientText.trim()) return
+    setIsDetailedEstimating(true)
+    setCalorieError('')
+    try {
+      const res = await fetch('/api/estimate-calories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'detailed',
+          itemName: itemName.trim(),
+          ingredients: ingredientText.trim(),
+          categoryHint: targetCategoryObj?.name || ''
+        })
+      })
+      const data = await res.json()
+      if (data.success && data.calories) {
+        setItemCalories(String(data.calories))
+        setCalorieSource('detailed')
+        setCalorieNote(data.note || '')
+        setShowDetailedCalorie(false)
+      } else {
+        setCalorieError(data.error || 'Detaylı kalori hesaplanamadı.')
+      }
+    } catch {
+      setCalorieError('Bağlantı hatası. Lütfen tekrar deneyin.')
+    }
+    setIsDetailedEstimating(false)
+  }
+
   // Hızlı önerilerden seçim yapıldığında veya boş seçildiğinde
   const handlePresetSelectChange = (val: string) => {
     setPresetDropdownVal(val)
@@ -372,6 +440,11 @@ export function LiveMenuEditor() {
       setItemProtein('')
       setItemCarbs('')
       setItemFat('')
+      setCalorieSource('manual')
+      setCalorieNote('')
+      setCalorieError('')
+      setShowDetailedCalorie(false)
+      setIngredientText('')
       setItemImage('')
       return
     }
@@ -413,6 +486,11 @@ export function LiveMenuEditor() {
       setItemFat(item.macros?.fat ? item.macros.fat.toString() : '')
       setItemImage(item.image_url || '')
       setItemIsFeatured(item.is_featured || false)
+      setCalorieSource(item.calorie_source || 'manual')
+      setCalorieNote('')
+      setCalorieError('')
+      setShowDetailedCalorie(false)
+      setIngredientText('')
     } else {
       setEditingItem(null)
       setPresetDropdownVal('')
@@ -426,6 +504,11 @@ export function LiveMenuEditor() {
       setItemFat('')
       setItemImage('')
       setItemIsFeatured(false)
+      setCalorieSource('manual')
+      setCalorieNote('')
+      setCalorieError('')
+      setShowDetailedCalorie(false)
+      setIngredientText('')
     }
     setCompressedPhotoInfo(null)
     setIsAddItemModalOpen(true)
@@ -468,7 +551,8 @@ export function LiveMenuEditor() {
                   allergens: cleanAllergens,
                   macros: macros,
                   image_url: itemImage || '',
-                  is_featured: itemIsFeatured
+                  is_featured: itemIsFeatured,
+                  calorie_source: calorieSource
                 } : item
               )
             }
@@ -488,7 +572,8 @@ export function LiveMenuEditor() {
         macros: macros,
         display_order: 1,
         is_available: true,
-        is_featured: itemIsFeatured
+        is_featured: itemIsFeatured,
+        calorie_source: calorieSource
       }
 
       setMenu(prev => prev ? ({
@@ -514,13 +599,17 @@ export function LiveMenuEditor() {
   }
 
   const toggleItemAvailability = (catId: string, itemId: string) => {
+    // Deprecated: Stok yönetimi yerine alerjen yönetimi getirildi
+  }
+
+  const handleInlineUpdate = (catId: string, itemId: string, field: 'price' | 'calories' | 'allergens', value: any) => {
     setMenu(prev => prev ? ({
       ...prev,
       categories: prev.categories.map(cat => 
         cat.id === catId ? {
           ...cat,
           items: cat.items.map(item => 
-            item.id === itemId ? { ...item, is_available: !item.is_available } : item
+            item.id === itemId ? { ...item, [field]: value } : item
           )
         } : cat
       )
@@ -923,80 +1012,136 @@ export function LiveMenuEditor() {
                 </div>
 
                 {/* Kategori Ürünleri */}
-                <CardContent className="p-3">
+                <CardContent className="p-0 sm:p-3">
                   {category.items.length === 0 ? (
                     <div className="text-center py-4 text-xs text-gray-400 italic">
                       Bu kategoride henüz ürün yok. "Ürün Ekle" butonuna basarak ilk lezzetinizi ekleyin.
                     </div>
                   ) : (
-                    <div className="divide-y">
-                      {category.items.map((item) => (
-                        <div key={item.id} className="py-2.5 flex items-center justify-between gap-3 first:pt-0 last:pb-0">
-                          <div className="flex items-center space-x-3">
-                            {item.image_url ? (
-                              <img 
-                                src={item.image_url} 
-                                alt={item.name} 
-                                className="w-12 h-12 rounded-lg object-cover border bg-gray-100 shrink-0" 
+                    <div className="flex flex-col">
+                      {/* KOLON BAŞLIKLARI */}
+                      <div className="grid grid-cols-[8fr_3fr_2fr_4fr_2fr] gap-2 px-3 py-2 bg-gray-50 border-y text-[10px] font-bold text-gray-500 uppercase">
+                        <div>Ürün</div>
+                        <div className="text-center">Fiyat</div>
+                        <div className="text-center">Kalori</div>
+                        <div className="text-center">Alerjenler</div>
+                        <div className="text-right">İşlemler</div>
+                      </div>
+                      
+                      <div className="divide-y">
+                        {category.items.map((item) => (
+                          <div key={item.id} className="grid grid-cols-[8fr_3fr_2fr_4fr_2fr] items-center gap-2 p-3 hover:bg-gray-50/50 transition-colors">
+                            {/* 1. ÜRÜN BİLGİSİ */}
+                            <div className="flex items-center space-x-3 overflow-hidden">
+                              {item.image_url ? (
+                                <img 
+                                  src={item.image_url} 
+                                  alt={item.name} 
+                                  className="w-10 h-10 rounded-lg object-cover border bg-gray-100 shrink-0" 
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-lg bg-gray-100 border flex items-center justify-center text-gray-400 shrink-0">
+                                  <Utensils className="h-4 w-4" />
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <div className="flex items-center space-x-1.5">
+                                  <span className="font-semibold text-xs text-gray-900 truncate">{item.name}</span>
+                                  {item.is_featured && (
+                                    <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded flex items-center shrink-0">
+                                      <Star className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-gray-500 line-clamp-1">{item.description}</p>
+                              </div>
+                            </div>
+
+                            {/* 2. FİYAT (INPUT) */}
+                            <div className="flex justify-center">
+                              <div className="relative w-full max-w-[80px]">
+                                <Input 
+                                  defaultValue={item.price ? item.price.replace(' ₺', '').replace('₺', '') : ''}
+                                  placeholder="120"
+                                  onBlur={(e) => {
+                                    const val = e.target.value.trim()
+                                    // Sadece sayı girildiyse TL formatında kaydet, aksi halde aynen kaydet
+                                    const formattedPrice = val ? (/^\d+(\.\d+)?(,\d+)?$/.test(val) ? `${val} ₺` : val) : ''
+                                    if (formattedPrice !== item.price) {
+                                      handleInlineUpdate(category.id, item.id, 'price', formattedPrice)
+                                    }
+                                  }}
+                                  className="h-8 text-xs text-center font-bold px-1 pr-4 w-full"
+                                />
+                                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500 font-bold pointer-events-none select-none">
+                                  ₺
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* 3. KALORİ (INPUT) */}
+                            <div className="flex justify-center">
+                              <div className="relative w-full max-w-[80px]">
+                                <Input 
+                                  defaultValue={item.calories || ''}
+                                  type="number"
+                                  placeholder="450"
+                                  onBlur={(e) => {
+                                    const val = e.target.value ? parseInt(e.target.value) : undefined
+                                    if (val !== item.calories) {
+                                      handleInlineUpdate(category.id, item.id, 'calories', val)
+                                    }
+                                  }}
+                                  className="h-8 text-xs text-center font-bold pl-1 pr-6 w-full"
+                                />
+                                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 font-medium pointer-events-none select-none">
+                                  kcal
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* 4. ALERJENLER (INPUT) */}
+                            <div className="flex justify-center">
+                              <Input 
+                                defaultValue={item.allergens ? item.allergens.join(', ') : ''}
+                                placeholder="Ör: Süt, Fıstık"
+                                onBlur={(e) => {
+                                  const val = e.target.value.trim()
+                                  const allergensArr = val ? val.split(',').map(a => a.trim()).filter(Boolean) : []
+                                  const oldVal = (item.allergens || []).join(', ')
+                                  const newVal = allergensArr.join(', ')
+                                  if (oldVal !== newVal) {
+                                    handleInlineUpdate(category.id, item.id, 'allergens', allergensArr.length > 0 ? allergensArr : undefined)
+                                  }
+                                }}
+                                className="h-8 text-[11px] text-center px-1 w-full max-w-[120px]"
                               />
-                            ) : (
-                              <div className="w-12 h-12 rounded-lg bg-gray-100 border flex items-center justify-center text-gray-400 shrink-0">
-                                <Utensils className="h-5 w-5" />
-                              </div>
-                            )}
-                            <div>
-                              <div className="flex items-center space-x-1.5">
-                                <span className="font-semibold text-xs text-gray-900">{item.name}</span>
-                                {item.is_featured && (
-                                  <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.2 rounded flex items-center">
-                                    <Star className="h-2.5 w-2.5 mr-0.5 fill-amber-500 text-amber-500" /> Şefin Tavsiyesi
-                                  </span>
-                                )}
-                                {!item.is_available && (
-                                  <span className="text-[10px] bg-red-100 text-red-800 font-bold px-1.5 py-0.2 rounded">
-                                    Tükendi
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-gray-500 line-clamp-1">{item.description}</p>
+                            </div>
+
+                            {/* 5. İŞLEMLER */}
+                            <div className="flex items-center justify-end space-x-1 shrink-0">
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-7 w-7 text-gray-500 hover:text-gray-900"
+                                onClick={() => openAddItemModal(category.id, item)}
+                                title="Detaylı Düzenle"
+                              >
+                                <Edit3 className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-7 w-7 text-gray-400 hover:text-red-500"
+                                onClick={() => handleDeleteItem(category.id, item.id)}
+                                title="Ürünü Sil"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
                             </div>
                           </div>
-
-                          <div className="flex items-center space-x-2 shrink-0">
-                            {item.price && (
-                              <span className="font-bold text-xs text-gray-900 mr-1" style={{ color: primaryColor }}>
-                                {item.price}
-                              </span>
-                            )}
-                            <button
-                              onClick={() => toggleItemAvailability(category.id, item.id)}
-                              className={`text-[10px] px-2 py-1 rounded border font-medium ${
-                                item.is_available ? 'bg-white text-gray-700 hover:bg-gray-50' : 'bg-red-50 text-red-700 border-red-200'
-                              }`}
-                            >
-                              {item.is_available ? 'Stokta' : 'Tükendi'}
-                            </button>
-                            <Button 
-                              size="icon" 
-                              variant="ghost" 
-                              className="h-7 w-7 text-gray-500 hover:text-gray-900"
-                              onClick={() => openAddItemModal(category.id, item)}
-                              title="Ürünü Düzenle"
-                            >
-                              <Edit3 className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button 
-                              size="icon" 
-                              variant="ghost" 
-                              className="h-7 w-7 text-gray-400 hover:text-red-500"
-                              onClick={() => handleDeleteItem(category.id, item.id)}
-                              title="Ürünü Sil"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
                 </CardContent>
@@ -1539,69 +1684,165 @@ export function LiveMenuEditor() {
               <p className="text-[11px] text-gray-400">Menünüzde görünecek ürün adıdır.</p>
             </div>
 
-            {/* 3. FİYAT VE KALORİ */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="i-price" className="font-bold text-gray-900 flex items-center justify-between">
-                  <span>Satış Fiyatı</span>
-                  <span className="text-[11px] text-gray-400 font-normal">(İsteğe Bağlı)</span>
+            {/* 3. FİYAT */}
+            <div className="space-y-1">
+              <Label htmlFor="i-price" className="font-bold text-gray-900 flex items-center justify-between">
+                <span>Satış Fiyatı</span>
+                <span className="text-[11px] text-gray-400 font-normal">(İsteğe Bağlı)</span>
+              </Label>
+              <Input
+                id="i-price"
+                placeholder="240 ₺ (Boş bırakılabilir)"
+                value={itemPrice}
+                onChange={(e) => setItemPrice(e.target.value)}
+                className="font-bold text-primary text-sm"
+              />
+            </div>
+
+            {/* 4. AI KALORİ HESAPLAMA */}
+            <div className="space-y-2 p-3 rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50/80 to-amber-50/50">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="i-cal" className="font-bold text-gray-900 flex items-center gap-1.5">
+                  <Flame className="h-4 w-4 text-orange-500" />
+                  Kalori (kcal)
+                  <span className="text-[10px] text-red-500 font-bold">*</span>
                 </Label>
-                <Input
-                  id="i-price"
-                  placeholder="240 ₺ (Boş bırakılabilir)"
-                  value={itemPrice}
-                  onChange={(e) => setItemPrice(e.target.value)}
-                  className="font-bold text-primary text-sm"
-                />
+                {!isEstimatingCalories && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!itemName || itemName.trim().length < 2 || isEstimatingCalories}
+                    onClick={handleEstimateCalories}
+                    className="h-7 text-[11px] font-bold border-orange-300 text-orange-700 hover:bg-orange-100 hover:text-orange-800 gap-1"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    AI ile Hesapla
+                  </Button>
+                )}
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="i-cal">Kalori (kcal)</Label>
+
+              <div className="relative">
                 <Input
                   id="i-cal"
                   type="number"
-                  placeholder="350"
+                  placeholder={isEstimatingCalories ? 'Hesaplanıyor...' : 'Kalori değeri'}
                   value={itemCalories}
-                  onChange={(e) => setItemCalories(e.target.value)}
+                  onChange={(e) => {
+                    setItemCalories(e.target.value)
+                    setCalorieSource('manual')
+                    setCalorieNote('')
+                  }}
+                  className={`font-bold text-sm pr-10 ${
+                    isEstimatingCalories ? 'opacity-60' : ''
+                  } ${!itemCalories ? 'border-red-300 bg-red-50/30' : 'border-orange-200'}`}
+                  disabled={isEstimatingCalories}
                 />
+                {isEstimatingCalories && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
+                  </div>
+                )}
               </div>
+
+              {/* AI Tahmini Bilgi Notu */}
+              {calorieSource === 'auto' && itemCalories && (
+                <div className="flex items-start gap-1.5 text-[11px] text-orange-700/90">
+                  <Sparkles className="h-3 w-3 mt-0.5 shrink-0 text-orange-500" />
+                  <div>
+                    <span className="font-semibold">AI Tahmini</span> — Ortalama gerçeğe en yakın kalori hesabıdır. 
+                    <button
+                      type="button"
+                      onClick={() => setShowDetailedCalorie(true)}
+                      className="underline font-bold hover:text-orange-900 ml-0.5"
+                    >
+                      Daha net hesaplama için detaylı hesaplama yaptırabilirsiniz.
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {calorieSource === 'detailed' && itemCalories && (
+                <div className="flex items-start gap-1.5 text-[11px] text-emerald-700/90">
+                  <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0 text-emerald-500" />
+                  <div>
+                    <span className="font-semibold">Detaylı Hesaplama</span>
+                    {calorieNote && <span> — {calorieNote}</span>}
+                  </div>
+                </div>
+              )}
+
+              {!itemCalories && !isEstimatingCalories && (
+                <p className="text-[11px] text-red-500/80 font-medium">
+                  Kalori bilgisi zorunludur. "AI ile Hesapla" butonunu kullanabilir veya elle girebilirsiniz.
+                </p>
+              )}
+
+              {calorieError && (
+                <div className="flex items-start gap-1.5 text-[11px] text-red-600">
+                  <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                  <span>{calorieError}</span>
+                </div>
+              )}
+
+              {/* Detaylı Hesaplama Butonu (AI tahmini yokken) */}
+              {calorieSource !== 'auto' && !showDetailedCalorie && (
+                <button
+                  type="button"
+                  onClick={() => setShowDetailedCalorie(true)}
+                  className="text-[11px] text-orange-600 hover:text-orange-800 font-semibold underline underline-offset-2"
+                >
+                  📝 Malzeme ve gramaj girerek detaylı hesaplama yap
+                </button>
+              )}
+
+              {/* Detaylı Hesaplama Paneli */}
+              {showDetailedCalorie && (
+                <div className="space-y-2 pt-2 border-t border-orange-200/70">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-bold text-gray-700 flex items-center gap-1">
+                      📝 Detaylı Kalori Hesaplama
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowDetailedCalorie(false)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-gray-500">
+                    Malzemeleri ve gramajlarını yazın, AI hassas kalori hesaplasın.
+                  </p>
+                  <Textarea
+                    placeholder="Örn: 150g dana kıyma, 60g cheddar peyniri, 1 adet hamburger ekmeği (80g), 100g patates kızartması, 30g marul-domates"
+                    value={ingredientText}
+                    onChange={(e) => setIngredientText(e.target.value)}
+                    rows={3}
+                    className="text-xs bg-white border-orange-200 focus-visible:ring-orange-300"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={!ingredientText.trim() || !itemName || isDetailedEstimating}
+                    onClick={handleDetailedEstimate}
+                    className="w-full h-8 text-xs font-bold bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-sm"
+                  >
+                    {isDetailedEstimating ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        Hesaplanıyor...
+                      </>
+                    ) : (
+                      <>
+                        🧮 Detaylı Hesapla
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
 
-            {/* MAKROLAR */}
-            <div className="grid grid-cols-3 gap-2">
-              <div className="space-y-1">
-                <Label htmlFor="i-protein" className="text-xs text-gray-700 font-semibold">Protein (g)</Label>
-                <Input
-                  id="i-protein"
-                  type="number"
-                  placeholder="25"
-                  value={itemProtein}
-                  onChange={(e) => setItemProtein(e.target.value)}
-                  className="text-xs font-mono"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="i-carbs" className="text-xs text-gray-700 font-semibold">Karb. (g)</Label>
-                <Input
-                  id="i-carbs"
-                  type="number"
-                  placeholder="40"
-                  value={itemCarbs}
-                  onChange={(e) => setItemCarbs(e.target.value)}
-                  className="text-xs font-mono"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="i-fat" className="text-xs text-gray-700 font-semibold">Yağ (g)</Label>
-                <Input
-                  id="i-fat"
-                  type="number"
-                  placeholder="15"
-                  value={itemFat}
-                  onChange={(e) => setItemFat(e.target.value)}
-                  className="text-xs font-mono"
-                />
-              </div>
-            </div>
 
             {/* 4. AÇIKLAMA */}
             <div className="space-y-1">
@@ -1716,7 +1957,11 @@ export function LiveMenuEditor() {
               <Button variant="outline" type="button" onClick={() => setIsAddItemModalOpen(false)}>
                 Vazgeç
               </Button>
-              <Button type="submit">
+              <Button 
+                type="submit" 
+                disabled={!itemCalories || isEstimatingCalories || isDetailedEstimating}
+                className={!itemCalories ? 'opacity-50 cursor-not-allowed' : ''}
+              >
                 {editingItem ? 'Güncellemeyi Kaydet' : 'Ürünü Menüye Ekle'}
               </Button>
             </div>

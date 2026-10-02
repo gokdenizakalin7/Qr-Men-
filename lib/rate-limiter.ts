@@ -121,8 +121,11 @@ export function getClientIp(req: NextRequest | Request): string {
 export const RATE_LIMITS = {
   // Gemini Menü Tarama: 10 dakikada en fazla 5 istek (Burst koruması)
   MENU_SCAN: { limit: 5, windowSeconds: 600 },
+  // AI Kalori Tahmini: 1 dakikada en fazla 30 istek (Toplu tarama desteği)
+  CALORIE_ESTIMATE: { limit: 30, windowSeconds: 60 },
   // Giriş Yapma: 15 dakikada en fazla 5 deneme (Brute-force koruması)
   AUTH_LOGIN: { limit: 5, windowSeconds: 900 },
   // Genel API rotaları: Dakikada en fazla 100 istek (DDoS & Scraping koruması)
   GENERAL_API: { limit: 100, windowSeconds: 60 }
 }
+

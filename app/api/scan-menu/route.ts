@@ -107,6 +107,7 @@ Menüdeki tüm kategori başlıklarını ve her kategorinin altındaki ürünler
 5. Fiyatlar: Eğer menüdeki fiyat kutucukları boşsa veya beyaz şeritle kapatılmışsa price alanını "" (boş) bırak. Fiyat yazıyorsa para birimiyle yaz (örneğin "120 ₺").
 6. Türkçe karakterleri (ç, ğ, ı, ö, ş, ü, Ç, Ğ, İ, Ö, Ş, Ü) ve parantezli detayları (ör: "(French press)", "(Sütlü)") eksiksiz ve temiz yaz.
 7. Menüdeki hiçbir geçerli kategoriyi ve ürünü atlama.
+8. Kaloriler: Her ürün için uzman bir diyetisyen gibi düşünerek, Türk mutfağı ve restoran standartlarına göre 1 kişilik porsiyon bazında ortalama kalori değerini (kcal) tahmin et. Ürün genellikle garnitürle (ör: burgerin yanındaki patates) sunuluyorsa kaloriyi buna göre hesapla. İçeceklerde standart fincan/bardak porsiyonunu baz al.
 
 Lütfen çıktıyı tam olarak şu JSON şemasında ver:
 {
@@ -117,7 +118,8 @@ Lütfen çıktıyı tam olarak şu JSON şemasında ver:
       "items": [
         {
           "name": "string",
-          "price": "string"
+          "price": "string",
+          "calories": "number (tahmini 1 porsiyon kcal, eğer tahmin edemiyorsan null yaz)"
         }
       ]
     }
@@ -207,7 +209,8 @@ Lütfen çıktıyı tam olarak şu JSON şemasında ver:
       name: sanitizeText(cat.name || 'Genel', 80),
       items: (cat.items || []).map((item: any) => ({
         name: sanitizeText(item.name || '', 120),
-        price: sanitizePrice(item.price || '')
+        price: sanitizePrice(item.price || ''),
+        calories: typeof item.calories === 'number' ? item.calories : null
       }))
     }))
 
