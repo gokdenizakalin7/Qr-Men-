@@ -54,7 +54,7 @@ export function BusinessDirectory() {
         <header className="px-4 lg:px-6 h-14 flex items-center border-b bg-white">
           <Link className="flex items-center justify-center font-bold text-lg text-primary" to="/">
             <QrCode className="h-6 w-6 mr-2 text-primary" />
-            <span>Qolay</span>
+            <span>QR Chef</span>
           </Link>
           <div className="ml-auto">
             <Button variant="outline" size="sm" asChild>
@@ -68,7 +68,7 @@ export function BusinessDirectory() {
             <div className="text-center space-y-3">
               <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Restoran Rehberi</h1>
               <p className="text-gray-600 max-w-xl mx-auto">
-                Qolay dijital menülerini kullanan mekanları keşfedin, gitmeden önce lezzetleri inceleyin.
+                QR Chef dijital menülerini kullanan mekanları keşfedin, gitmeden önce lezzetleri inceleyin.
               </p>
             </div>
 
@@ -143,7 +143,7 @@ export function BusinessDirectory() {
         </main>
 
         <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t bg-white">
-          <p className="text-xs text-gray-500">© 2024 Qolay. Tüm hakları saklıdır.</p>
+          <p className="text-xs text-gray-500">© 2024 QR Chef. Tüm hakları saklıdır.</p>
           <nav className="sm:ml-auto flex gap-4 sm:gap-6">
             <button
               className="text-xs hover:underline underline-offset-4 text-gray-500"

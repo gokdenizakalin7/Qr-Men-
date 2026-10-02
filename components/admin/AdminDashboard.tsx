@@ -85,7 +85,7 @@ export function AdminDashboard() {
 
   // Sistem Ayarları
   const [systemSettings, setSystemSettings] = useState({
-    platformName: 'Qolay',
+    platformName: 'QR Chef',
     defaultDomain: 'qolay.com',
     defaultCurrency: '₺',
     maintenanceMode: false
@@ -296,7 +296,7 @@ export function AdminDashboard() {
               <ShieldCheck className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="font-extrabold text-xl text-gray-900 leading-tight">Qolay • Sistem Yöneticisi Paneli</h1>
+              <h1 className="font-extrabold text-xl text-gray-900 leading-tight">QR Chef • Sistem Yöneticisi Paneli</h1>
               <p className="text-xs text-gray-500">Kullanıcı rolleri, e-posta aktivasyonları ve aktif menüler</p>
             </div>
           </div>

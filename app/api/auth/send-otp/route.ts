@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     } else {
       // Production: Burada gerçek e-posta gönderimi yapılır
       // Örnek: Resend, SendGrid, Nodemailer, AWS SES vb.
-      // await sendEmail({ to: email, subject: 'Qolay Doğrulama Kodu', body: `Kodunuz: ${code}` })
+      // await sendEmail({ to: email, subject: 'QR Chef Doğrulama Kodu', body: `Kodunuz: ${code}` })
 
       return NextResponse.json({
         success: true,

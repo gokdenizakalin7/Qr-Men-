@@ -159,7 +159,7 @@ export function AccountActivation() {
         <div className="text-center">
           <Link to="/" className="inline-flex items-center text-primary font-extrabold text-2xl mb-1">
             <QrCode className="h-7 w-7 mr-2" />
-            Qolay
+            QR Chef
           </Link>
         </div>
 

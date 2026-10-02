@@ -428,7 +428,7 @@ export function QRCodesContent() {
                   </div>
                 )}
 
-                <span className="text-[9px] text-gray-400">Powered by Qolay</span>
+                <span className="text-[9px] text-gray-400">Powered by QR Chef</span>
               </div>
             )}
 

@@ -1355,7 +1355,7 @@ export function LiveMenuEditor() {
               </div>
 
               <div className="p-3 bg-white border-t text-center text-[10px] text-gray-400">
-                <span>{currentRestaurant?.name} • Qolay</span>
+                <span>{currentRestaurant?.name} • QR Chef</span>
               </div>
             </div>
 

@@ -14,7 +14,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Qolay - Dijital QR Menü Yönetim Sistemi",
+  title: "QR Chef - Dijital QR Menü Yönetim Sistemi",
   description: "QR kodlu dijital menülerinizi kolayca oluşturun, yönetin ve paylaşın.",
 };
 

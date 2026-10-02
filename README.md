@@ -1,6 +1,6 @@
-# Qolay - Digital Menu Management System
+# QR Chef - Digital Menu Management System
 
-Qolay is a modern, full-stack digital menu management system built with Next.js 14. It enables restaurants to create, manage, and share digital menus through QR codes, providing a seamless contactless dining experience.
+QR Chef is a modern, full-stack digital menu management system built with Next.js 14. It enables restaurants to create, manage, and share digital menus through QR codes, providing a seamless contactless dining experience.
 
 ## 🚀 Features
 

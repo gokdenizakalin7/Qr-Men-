@@ -1,24 +1,38 @@
-# Use the official Node.js 18 image as a parent image
-FROM node:18-alpine
+# Stage 1: Install dependencies
+FROM node:18-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
 
-# Set the working directory
+# Stage 2: Build the application
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Stage 3: Production runtime
+FROM node:18-alpine AS runner
 WORKDIR /app
 
-# Copy package.json and package-lock.json
-COPY package*.json ./
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Install dependencies
-RUN npm install
+# Create non-root user for security
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
-# Copy the rest of your app's source code
-COPY . .
+# Copy necessary files from build stages
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 
-# Build your Next.js app
-#RUN npm run build
+USER nextjs
 
-# Expose the port Next.js runs on
 EXPOSE 3000
 
-# Start the app
-#CMD ["npm", "start"]
-CMD ["npm", "run", "dev"]
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+CMD ["node", "server.js"]

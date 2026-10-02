@@ -246,6 +246,7 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
     })
 
     return () => observer.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredCategories])
 
   const scrollToCategory = (categoryId: string) => {
@@ -617,8 +618,8 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
                       {t.allergens}
                     </h4>
                     <div className="flex flex-wrap gap-2">
-                      {selectedItem.allergens.map((alg, i) => (
-                        <span key={i} className="bg-white dark:bg-[#2c2c2e] text-rose-900 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm flex items-center border border-rose-100">
+                      {selectedItem.allergens.map((alg) => (
+                        <span key={alg} className="bg-white dark:bg-[#2c2c2e] text-rose-900 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm flex items-center border border-rose-100">
                           <span className="mr-1.5 text-sm">{getAllergenIcon(alg)}</span> {alg}
                         </span>
                       ))}
@@ -634,7 +635,7 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
       {/* Footer */}
       <footer className="bg-white dark:bg-[#2c2c2e] border-t py-4 text-center text-xs text-gray-500 dark:text-zinc-500 space-y-2 mt-auto">
         <div className="container mx-auto px-4">
-          <p>© {new Date().getFullYear()} {restaurant.name} • Powered by <strong>Qolay</strong></p>
+          <p>© {new Date().getFullYear()} {restaurant.name} • Powered by <strong>QR Chef</strong></p>
           <div className="flex justify-center space-x-4 mt-1.5 text-[11px]">
             <button onClick={() => setIsTermsOpen(true)} className="hover:underline text-gray-400 dark:text-zinc-500">
               Kullanım Koşulları

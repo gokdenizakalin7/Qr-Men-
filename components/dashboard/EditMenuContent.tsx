@@ -291,8 +291,8 @@ export function EditMenuContent() {
                             <div className="text-xs text-gray-500 line-clamp-1">{item.description}</div>
                             {item.allergens && item.allergens.length > 0 && (
                               <div className="flex gap-1 mt-1">
-                                {item.allergens.map((a, i) => (
-                                  <span key={i} className="text-[10px] bg-red-50 text-red-700 px-1.5 py-0.2 rounded border border-red-200">
+                                {item.allergens.map((a) => (
+                                  <span key={a} className="text-[10px] bg-red-50 text-red-700 px-1.5 py-0.2 rounded border border-red-200">
                                     {a}
                                   </span>
                                 ))}

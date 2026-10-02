@@ -48,7 +48,7 @@ export function Sidebar({
         <div className="flex h-16 items-center justify-between px-5 border-b">
           <Link to="/dashboard" className="flex items-center space-x-2 font-bold text-xl text-primary">
             <QrCode className="h-6 w-6 text-primary" />
-            <span>Qolay</span>
+            <span>QR Chef</span>
           </Link>
           <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(false)} className="lg:hidden">
             <X className="h-5 w-5" />
