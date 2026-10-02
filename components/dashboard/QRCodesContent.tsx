@@ -419,14 +419,14 @@ export function QRCodesContent() {
                     className="inline-block px-3 py-0.5 rounded-full text-white text-[11px] font-extrabold shadow-xs"
                     style={{ backgroundColor: primaryColor }}
                   >
-                    {activePrintTable.name}
+                    {activePrintTable?.name}
                   </div>
                 </div>
 
                 {/* QR Kod Çerçevesi */}
                 <div className="p-3 bg-white rounded-2xl border-2 border-gray-200 shadow-md">
                   <img 
-                    src={getQRImageUrl(getTableLink(activePrintTable.name), 220)} 
+                    src={getQRImageUrl(getTableLink(activePrintTable?.name || ''), 220)} 
                     alt="QR" 
                     className="w-44 h-44 object-contain"
                   />
@@ -471,13 +471,13 @@ export function QRCodesContent() {
                     className="text-[10px] text-white px-2 py-0.5 rounded-full font-bold"
                     style={{ backgroundColor: primaryColor }}
                   >
-                    {activePrintTable.name}
+                    {activePrintTable?.name}
                   </span>
                 </div>
 
                 <div className="p-2 bg-white rounded-xl border shadow-xs">
                   <img 
-                    src={getQRImageUrl(getTableLink(activePrintTable.name), 180)} 
+                    src={getQRImageUrl(getTableLink(activePrintTable?.name || ''), 180)} 
                     alt="QR" 
                     className="w-32 h-32 object-contain"
                   />

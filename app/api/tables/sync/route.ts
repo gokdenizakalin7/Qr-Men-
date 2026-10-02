@@ -51,8 +51,8 @@ export async function POST(request: Request) {
 
     if (upsertData.length > 0) {
       // Split new vs existing
-      const newTables = upsertData.filter(t => !t.id)
-      const existingToUpdate = upsertData.filter(t => t.id)
+      const newTables = upsertData.filter((t: any) => !t.id)
+      const existingToUpdate = upsertData.filter((t: any) => t.id)
 
       if (newTables.length > 0) {
         await supabase.from('qr_tables').insert(newTables)
