@@ -27,23 +27,38 @@ export function Login() {
     setIsLoading(true)
 
     try {
-      // 1. Supabase üzerinden giriş yap
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password: password.trim()
+      // 1. Supabase'e doğrudan değil, kendi arka ucumuz (API) üzerinden bağlanıyoruz.
+      // Bu, Safari/VPN/Adblocker gibi tarayıcı engellerini (Failed to fetch) %100 aşar!
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password: password.trim()
+        })
       })
 
-      if (authError) {
-        setError('E-posta veya şifre hatalı.')
+      const responseData = await res.json()
+
+      if (!res.ok || responseData.error) {
+        setError(responseData.error || 'E-posta veya şifre hatalı.')
         setIsLoading(false)
         return
       }
 
-      if (!authData.user) {
+      const authData = responseData.data
+
+      if (!authData?.user) {
         setError('Kullanıcı bilgisi alınamadı.')
         setIsLoading(false)
         return
       }
+
+      // Tarayıcıya oturumu kaydet
+      await supabase.auth.setSession({
+        access_token: authData.session.access_token,
+        refresh_token: authData.session.refresh_token
+      })
 
       const userEmail = authData.user.email?.toLowerCase()
 
