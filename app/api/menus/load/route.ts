@@ -35,7 +35,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ menus: [] })
     }
 
-    const menu = menusData[0]
+    const menu: any = menusData[0]
 
     // Fetch categories
     const { data: categoriesData } = await supabase

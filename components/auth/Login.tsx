@@ -79,7 +79,7 @@ export function Login() {
         .single()
 
       if (memberData && memberData.organizations) {
-        const org = memberData.organizations
+        const org = memberData.organizations as any
         
         // Frontend'in eski mock sistemini bozmamak için veriyi localstorage'a formatlı koyuyoruz
         localStorage.setItem('currentRestaurant', JSON.stringify({
