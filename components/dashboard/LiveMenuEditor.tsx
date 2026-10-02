@@ -47,6 +47,7 @@ import { sanitizeText, sanitizeMultilineText, sanitizePrice } from '@/lib/saniti
 import { ScanMenuModal } from '@/components/modals/ScanMenuModal'
 import { motion, AnimatePresence } from 'framer-motion'
 import { compressImageFile, IMAGE_PRESETS, formatFileSize } from '@/lib/image-compression'
+import { safeJsonParse } from '@/lib/utils'
 
 // KURUMSAL & SEO UYUMLU ANA KATEGORİ REHBERİ
 export const ORDERED_CATEGORY_GROUPS = [
@@ -206,11 +207,8 @@ export function LiveMenuEditor() {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('currentRestaurant')
       if (stored) {
-        try {
-          return JSON.parse(stored)
-        } catch (e) {
-          console.error(e)
-        }
+        const parsed = safeJsonParse<Restaurant | null>(stored, null)
+        if (parsed) return parsed
       }
     }
     return MOCK_RESTAURANTS[0]
@@ -221,6 +219,26 @@ export function LiveMenuEditor() {
     const list = getStoredMenus(subdomain)
     return list.length > 0 ? list[0] : null
   })
+
+  // SUPABASE'TEN YÜKLEME
+  useEffect(() => {
+    async function loadFromSupabase() {
+      try {
+        const res = await fetch(`/api/menus/load?subdomain=${subdomain}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data.menus && data.menus.length > 0) {
+            setMenu(data.menus[0])
+            // LocalStorage'ı da senkronize et ki draft olarak kalsın
+            setStoredMenus(subdomain, data.menus)
+          }
+        }
+      } catch (err) {
+        console.error("Supabase'den menü yüklenemedi:", err)
+      }
+    }
+    loadFromSupabase()
+  }, [subdomain])
 
   const [primaryColor, setPrimaryColor] = useState(currentRestaurant?.branding?.primaryColor || '#e11d48')
   
@@ -677,9 +695,28 @@ export function LiveMenuEditor() {
     setMenu(prev => prev ? ({ ...prev, categories: newCats }) : null)
   }
 
-  const handleSaveAll = () => {
-    setSavedSuccess(true)
-    setTimeout(() => setSavedSuccess(false), 2500)
+  const handleSaveAll = async () => {
+    if (!menu) return
+    const subdomain = 'lezzet-ocakbasi' // TODO: dynamic
+    
+    // Draft as backup
+    setStoredMenus(subdomain, [menu])
+    
+    try {
+      const res = await fetch('/api/menus/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subdomain, menu })
+      })
+      if (!res.ok) throw new Error('Failed to save to Supabase')
+      
+      console.log('Menü Supabase veritabanına kaydedildi:', menu)
+      setSavedSuccess(true)
+      setTimeout(() => setSavedSuccess(false), 2500)
+    } catch (e) {
+      console.error(e)
+      alert("Menü kaydedilirken hata oluştu!")
+    }
   }
 
   const activeCategoriesForPreview = menu ? menu.categories.filter(c => c.is_active) : []
@@ -1354,8 +1391,8 @@ export function LiveMenuEditor() {
                         <AlertCircle className="h-3 w-3 mr-1 text-red-500" /> Alerjenler:
                       </span>
                       <div className="flex flex-wrap gap-1">
-                        {previewSelectedItem.allergens.map((a, i) => (
-                          <span key={i} className="bg-red-50 text-red-700 px-1.5 py-0.5 rounded border border-red-200">
+                        {previewSelectedItem.allergens.map((a) => (
+                          <span key={a} className="bg-red-50 text-red-700 px-1.5 py-0.5 rounded border border-red-200">
                             {a}
                           </span>
                         ))}
