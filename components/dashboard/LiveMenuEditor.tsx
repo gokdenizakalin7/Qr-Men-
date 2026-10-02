@@ -229,8 +229,22 @@ export function LiveMenuEditor() {
           const data = await res.json()
           if (data.menus && data.menus.length > 0) {
             setMenu(data.menus[0])
-            // LocalStorage'ı da senkronize et ki draft olarak kalsın
             setStoredMenus(subdomain, data.menus)
+          } else {
+            // Veritabanında menü yoksa, sıfırdan bir şablon veya boş menü oluştur
+            const blankMenu: Menu = {
+              id: 'new-menu',
+              name: 'Yeni Menü',
+              description: 'Açıklama ekleyin...',
+              image_url: '',
+              is_listed: true,
+              layout: 'grid',
+              available_days: [1,2,3,4,5,6,7],
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              categories: []
+            }
+            setMenu(blankMenu)
           }
         }
       } catch (err) {
