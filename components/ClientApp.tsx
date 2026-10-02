@@ -36,11 +36,19 @@ function DashboardLayout() {
 
     const stored = localStorage.getItem('currentRestaurant')
     if (stored) {
-      const parsed = safeJsonParse<{ subdomain?: string } | null>(stored, null)
+      const parsed = safeJsonParse<any>(stored, null)
       if (parsed?.subdomain) {
-        const all: Restaurant[] = safeJsonParse(localStorage.getItem('all_restaurants'), [])
-        const found = all.find(r => r.subdomain === parsed.subdomain) || MOCK_RESTAURANTS.find(r => r.subdomain === parsed.subdomain)
-        setCurrentRestaurant(found || MOCK_RESTAURANTS[0])
+        setCurrentRestaurant({
+          id: parsed.id || 'org-1',
+          subdomain: parsed.subdomain,
+          name: parsed.name || 'Restoranım',
+          role: 'restaurant',
+          status: 'active',
+          currency: '₺',
+          businessInfo: {
+            email: parsed.email || 'yonetici@restoran.com'
+          }
+        } as Restaurant)
       } else {
         setCurrentRestaurant(MOCK_RESTAURANTS[0])
       }
