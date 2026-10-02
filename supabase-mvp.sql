@@ -316,3 +316,15 @@ create trigger on_auth_user_created
 -- 1. "menu-images" adında public bucket oluşturun
 -- 2. Allowed MIME types: image/jpeg, image/png, image/webp
 -- 3. Max file size: 5MB
+
+-- ============================================
+-- 8. QR_TABLES (Masalar / QR Kodlar)
+-- ============================================
+create table qr_tables (
+    id uuid primary key default uuid_generate_v4(),
+    organization_id uuid references organizations(id) on delete cascade,
+    name text not null,
+    views integer default 0,
+    created_at timestamp with time zone default now(),
+    updated_at timestamp with time zone default now()
+);

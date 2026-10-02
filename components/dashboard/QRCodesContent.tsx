@@ -45,14 +45,37 @@ export function QRCodesContent() {
   const wifiName = currentRestaurant.businessInfo?.wifi_name || ''
   const wifiPass = currentRestaurant.businessInfo?.wifi_password || ''
 
-  const [tables, setTables] = useState<TableItem[]>([
-    { id: 'tbl-1', name: 'Masa 1', views: 340 },
-    { id: 'tbl-2', name: 'Masa 2', views: 290 },
-    { id: 'tbl-3', name: 'Masa 3 (Bahçe)', views: 420 },
-    { id: 'tbl-4', name: 'Masa 4', views: 510 },
-    { id: 'tbl-5', name: 'Masa 5', views: 180 },
-    { id: 'tbl-6', name: 'Masa 6 (Teras)', views: 260 },
-  ])
+  const [tables, setTables] = useState<TableItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  React.useEffect(() => {
+    async function loadTables() {
+      try {
+        const res = await fetch(`/api/tables/load?subdomain=${subdomain}`)
+        if (res.ok) {
+          const data = await res.json()
+          setTables(data.tables || [])
+        }
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadTables()
+  }, [subdomain])
+
+  const syncWithSupabase = async (updatedTables: TableItem[]) => {
+    try {
+      await fetch('/api/tables/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subdomain, tables: updatedTables })
+      })
+    } catch (err) {
+      console.error(err)
+    }
+  }
 
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [isAddTableOpen, setIsAddTableOpen] = useState(false)
@@ -61,7 +84,7 @@ export function QRCodesContent() {
   // ŞABLON MODALI STATE'İ
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<'acrylic' | 'sticker' | 'bulk_a4'>('acrylic')
-  const [activePrintTable, setActivePrintTable] = useState<TableItem>(tables[0])
+  const [activePrintTable, setActivePrintTable] = useState<TableItem | null>(null)
 
   const getTableLink = (tableName: string) => {
     return `${window.location.origin}/menu/${subdomain}?table=${encodeURIComponent(tableName)}`
@@ -77,7 +100,7 @@ export function QRCodesContent() {
     setTimeout(() => setCopiedId(null), 2000)
   }
 
-  const handleAddTable = (e: React.FormEvent) => {
+  const handleAddTable = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newTableName) return
 
@@ -87,13 +110,17 @@ export function QRCodesContent() {
       views: 0
     }
 
-    setTables([...tables, newTable])
+    const updated = [...tables, newTable]
+    setTables(updated)
     setNewTableName('')
     setIsAddTableOpen(false)
+    await syncWithSupabase(updated)
   }
 
-  const handleDeleteTable = (id: string) => {
-    setTables(tables.filter(t => t.id !== id))
+  const handleDeleteTable = async (id: string) => {
+    const updated = tables.filter(t => t.id !== id)
+    setTables(updated)
+    await syncWithSupabase(updated)
   }
 
   const handleOpenPrintModal = (table?: TableItem, tmpl: 'acrylic' | 'sticker' | 'bulk_a4' = 'acrylic') => {

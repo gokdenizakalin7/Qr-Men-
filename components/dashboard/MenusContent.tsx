@@ -23,20 +23,55 @@ export function MenusContent() {
   })
 
   const subdomain = currentRestaurant?.subdomain || 'lezzet-ocakbasi'
-  const [menus, setMenus] = useState<Menu[]>(() => {
-    return getStoredMenus(subdomain)
-  })
+  const [menus, setMenus] = useState<Menu[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  React.useEffect(() => {
+    async function loadMenus() {
+      try {
+        const res = await fetch(`/api/menus/load?subdomain=${subdomain}`)
+        if (res.ok) {
+          const data = await res.json()
+          setMenus(data.menus || [])
+        } else {
+          setMenus(getStoredMenus(subdomain))
+        }
+      } catch (err) {
+        console.error(err)
+        setMenus(getStoredMenus(subdomain))
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadMenus()
+  }, [subdomain])
 
   const [isCreateMenuModalOpen, setIsCreateMenuModalOpen] = useState(false)
   const [isScanMenuModalOpen, setIsScanMenuModalOpen] = useState(false)
   const [selectedQRMenu, setSelectedQRMenu] = useState<any>(null)
   const navigate = useNavigate()
 
+  const syncWithSupabase = async (updatedMenus: Menu[]) => {
+    try {
+      await fetch('/api/menus/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subdomain,
+          menus: updatedMenus
+        })
+      })
+    } catch (error) {
+      console.error('Failed to sync menus with DB:', error)
+    }
+  }
+
   const handleDelete = (id: string) => {
     if (confirm('Bu menüyü silmek istediğinize emin misiniz?')) {
       const updated = menus.filter(menu => menu.id !== id)
       setMenus(updated)
       setStoredMenus(subdomain, updated)
+      syncWithSupabase(updated)
     }
   }
 
@@ -64,6 +99,8 @@ export function MenusContent() {
     const updated = [...menus, created]
     setMenus(updated)
     setStoredMenus(subdomain, updated)
+    syncWithSupabase(updated)
+    setIsCreateMenuModalOpen(false)
   }
 
   const toggleMenuListing = (id: string) => {
@@ -72,6 +109,7 @@ export function MenusContent() {
     )
     setMenus(updated)
     setStoredMenus(subdomain, updated)
+    syncWithSupabase(updated)
   }
 
   return (

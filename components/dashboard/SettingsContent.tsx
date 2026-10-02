@@ -47,7 +47,10 @@ export function SettingsContent() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const handleSave = () => {
+  const [isSaving, setIsSaving] = useState(false)
+
+  const handleSave = async () => {
+    setIsSaving(true)
     const cleanBusinessInfo = {
       name: sanitizeText(businessInfo.name, 100),
       phone: sanitizeText(businessInfo.phone, 30),
@@ -82,11 +85,31 @@ export function SettingsContent() {
       }
     }
 
-    setCurrentRestaurant(updatedRest)
-    localStorage.setItem('currentRestaurant', JSON.stringify(updatedRest))
-
-    setSaveMessage('Ayarlar başarıyla kaydedildi!')
-    setTimeout(() => setSaveMessage(''), 3000)
+    try {
+      if (updatedRest.id && updatedRest.id !== 'org-1' && !updatedRest.id.startsWith('mock')) {
+        const res = await fetch('/api/organizations/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: updatedRest.id,
+            name: updatedRest.name,
+            currency: updatedRest.currency,
+            businessInfo: updatedRest.businessInfo,
+            branding: updatedRest.branding
+          })
+        })
+        if (!res.ok) throw new Error('API Error')
+      }
+      setCurrentRestaurant(updatedRest)
+      localStorage.setItem('currentRestaurant', JSON.stringify(updatedRest))
+  
+      setSaveMessage('Ayarlar başarıyla kaydedildi!')
+    } catch (err) {
+      setSaveMessage('Kaydedilirken hata oluştu.')
+    } finally {
+      setIsSaving(false)
+      setTimeout(() => setSaveMessage(''), 3000)
+    }
   }
 
   return (
