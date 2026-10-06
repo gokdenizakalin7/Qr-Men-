@@ -11,8 +11,8 @@ import { createClient } from '@supabase/supabase-js'
  *   const { data } = await supabase.from('organizations').select('*')
  */
 
-const supabaseUrl = 'https://cbezoygmckwthryftcax.supabase.co'
-const supabaseAnonKey = 'sb_publishable_-HFFhB2J673GFikS6iowkg_E0Leq4Yr'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn(

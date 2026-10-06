@@ -8,8 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { authFetch } from '@/lib/api-client'
 import { Restaurant } from '@/lib/types'
-import { MOCK_RESTAURANTS } from '@/lib/mock-data'
 import { 
   QrCode, 
   Download, 
@@ -33,18 +33,18 @@ export interface TableItem {
 }
 
 export function QRCodesContent() {
-  const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant>(() => {
+  const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant | null>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('currentRestaurant')
       if (stored) return JSON.parse(stored)
     }
-    return MOCK_RESTAURANTS[0]
+    return null
   })
 
-  const subdomain = currentRestaurant.subdomain || 'lezzet-ocakbasi'
-  const primaryColor = currentRestaurant.branding?.primaryColor || '#e11d48'
-  const wifiName = currentRestaurant.businessInfo?.wifi_name || ''
-  const wifiPass = currentRestaurant.businessInfo?.wifi_password || ''
+  const subdomain = currentRestaurant?.subdomain || 'lezzet-ocakbasi'
+  const primaryColor = currentRestaurant?.branding?.primaryColor || '#e11d48'
+  const wifiName = currentRestaurant?.businessInfo?.wifi_name || ''
+  const wifiPass = currentRestaurant?.businessInfo?.wifi_password || ''
 
   const [tables, setTables] = useState<TableItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -52,7 +52,7 @@ export function QRCodesContent() {
   React.useEffect(() => {
     async function loadTables() {
       try {
-        const res = await fetch(`/api/tables/load?subdomain=${subdomain}`)
+        const res = await authFetch(`/api/tables/load?subdomain=${subdomain}`)
         if (res.ok) {
           const data = await res.json()
           setTables(data.tables || [])
@@ -66,15 +66,21 @@ export function QRCodesContent() {
     loadTables()
   }, [subdomain])
 
-  const syncWithSupabase = async (updatedTables: TableItem[]) => {
+  const syncWithSupabase = async (updatedTables: TableItem[], previousTables: TableItem[]) => {
     try {
-      await fetch('/api/tables/sync', {
+      const res = await authFetch('/api/tables/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subdomain, tables: updatedTables })
       })
-    } catch (err) {
+      if (!res.ok) {
+        throw new Error('Sunucu hatası')
+      }
+    } catch (err: any) {
       console.error(err)
+      // toast imported in MenusContent, but maybe not here? We need to import toast if missing.
+      // Wait, let's just rollback
+      setTables(previousTables)
     }
   }
 
@@ -109,17 +115,19 @@ export function QRCodesContent() {
       views: 0
     }
 
+    const previousTables = [...tables]
     const updated = [...tables, newTable]
     setTables(updated)
     setNewTableName('')
     setIsAddTableOpen(false)
-    await syncWithSupabase(updated)
+    await syncWithSupabase(updated, previousTables)
   }
 
   const handleDeleteTable = async (id: string) => {
+    const previousTables = [...tables]
     const updated = tables.filter(t => t.id !== id)
     setTables(updated)
-    await syncWithSupabase(updated)
+    await syncWithSupabase(updated, previousTables)
   }
 
   const handleOpenPrintModal = (table?: TableItem, tmpl: 'acrylic' | 'sticker' | 'bulk_a4' = 'acrylic') => {

@@ -93,6 +93,8 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         )
       }
+      // Doğrulanmış mime türünü kaydet
+      img.mimeType = validation.mimeType
     }
 
     const promptText = `Sen uzman bir restoran ve kafe menü ayrıştırıcısısın.
@@ -145,11 +147,8 @@ Lütfen çıktıyı tam olarak şu JSON şemasında ver:
 
     // Aktif modeller
     const modelsToTry = [
-      'gemini-3.5-flash-lite',
       'gemini-3.5-flash',
-      'gemini-3.1-flash-lite',
-      'gemini-3.8-flash',
-      'gemini-flash-latest'
+      'gemini-3.5-flash-lite'
     ]
 
     let lastError: any = null
@@ -157,10 +156,13 @@ Lütfen çıktıyı tam olarak şu JSON şemasında ver:
 
     for (const model of modelsToTry) {
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
         const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey
+          },
           body: JSON.stringify({
             contents: [{ parts }],
             generationConfig: {
@@ -171,9 +173,7 @@ Lütfen çıktıyı tam olarak şu JSON şemasında ver:
         })
 
         if (!res.ok) {
-          const errData = await res.json().catch(() => ({}))
-          const message = errData?.error?.message || `HTTP ${res.status}`
-          lastError = message
+          lastError = `HTTP ${res.status}`
           continue
         }
 
@@ -190,7 +190,7 @@ Lütfen çıktıyı tam olarak şu JSON şemasında ver:
 
     if (!responseText) {
       return NextResponse.json(
-        { error: `Gemini API hatası: ${lastError || 'Yanıt alınamadı.'}` },
+        { error: 'Görüntü analiz edilemedi. Lütfen daha net bir fotoğraf yükleyin veya daha sonra tekrar deneyin.' },
         { status: 500 }
       )
     }

@@ -22,7 +22,6 @@ import { SettingsContent } from '@/components/dashboard/SettingsContent'
 import { PublicMenuView } from '@/components/public/PublicMenuView'
 import { MOCK_RESTAURANTS } from '@/lib/mock-data'
 import { Restaurant } from '@/lib/types'
-import { syncClientSessionCookies } from '@/lib/session'
 import { safeJsonParse } from '@/lib/utils'
 
 function DashboardLayout() {
@@ -31,30 +30,47 @@ function DashboardLayout() {
   const [userRole, setUserRole] = useState<string>('restaurant')
 
   useEffect(() => {
-    const role = localStorage.getItem('user_role') || 'restaurant'
-    setUserRole(role)
-
-    const stored = localStorage.getItem('currentRestaurant')
-    if (stored) {
-      const parsed = safeJsonParse<any>(stored, null)
-      if (parsed?.subdomain) {
-        setCurrentRestaurant({
-          id: parsed.id || 'org-1',
-          subdomain: parsed.subdomain,
-          name: parsed.name || 'Restoranım',
-          role: 'restaurant',
-          status: 'active',
-          currency: '₺',
-          businessInfo: {
-            email: parsed.email || 'yonetici@restoran.com'
+    async function loadSession() {
+      try {
+        const token = localStorage.getItem('sb-access-token') || '' // Try to get token if stored, or authFetch will handle it
+        
+        // Alternatively, use our /api/auth/me endpoint which checks cookies/headers
+        const res = await fetch('/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`
           }
-        } as Restaurant)
-      } else {
-        setCurrentRestaurant(MOCK_RESTAURANTS[0])
+        })
+        
+        if (res.ok) {
+          const data = await res.json()
+          setUserRole(data.role)
+          
+          if (data.organization) {
+            const currentObj = {
+              id: data.organization.id,
+              subdomain: data.organization.subdomain,
+              name: data.organization.name || 'Restoranım',
+              role: data.role,
+              status: 'active',
+              currency: '₺',
+              businessInfo: {
+                email: data.email || 'yonetici@restoran.com',
+                business_phone: data.organization.business_phone
+              }
+            }
+            setCurrentRestaurant(currentObj as Restaurant)
+            localStorage.setItem('currentRestaurant', JSON.stringify(currentObj))
+          }
+        } else {
+          // Eğer giriş yapmamışsa, login'e yönlendirebiliriz, ancak şimdilik sessizce bırakıyoruz.
+          // Çünkü bu layout /dashboard altında korunuyor (AuthGuard ile).
+        }
+      } catch (err) {
+        console.error("Failed to load session", err)
       }
-    } else {
-      setCurrentRestaurant(MOCK_RESTAURANTS[0])
     }
+    
+    loadSession()
 
     const handleResize = () => {
       if (window.innerWidth >= 1024) {
@@ -70,8 +86,8 @@ function DashboardLayout() {
   }, [])
 
   const userInfo = {
-    name: currentRestaurant?.name || 'Restoranım',
-    email: currentRestaurant?.businessInfo?.email || 'yonetici@restoran.com'
+    name: currentRestaurant?.name || 'Yükleniyor...',
+    email: currentRestaurant?.businessInfo?.email || '...'
   }
 
   return (
@@ -166,7 +182,6 @@ export function ClientApp() {
 
   useEffect(() => {
     setIsClient(true)
-    syncClientSessionCookies()
   }, [])
 
   if (!isClient) {

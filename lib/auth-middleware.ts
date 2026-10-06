@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { logSecurityEvent } from './security-logger'
 import { getClientIp } from './rate-limiter'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 /**
  * Enterprise Sunucu Taraflı Yetkilendirme ve Çoklu Kiracı (Tenant / IDOR) Koruma Modülü
@@ -12,59 +16,43 @@ export interface SessionUser {
   restaurantId?: string
 }
 
-/**
- * İstekten oturum bilgilerini ayıklar (Cookie veya Authorization Header)
- */
-export function verifySession(req: NextRequest): SessionUser | null {
-  // 1. Authorization header kontrolü
+export async function verifySession(req: NextRequest): Promise<SessionUser | null> {
   const authHeader = req.headers.get('authorization')
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.slice(7).trim()
-    try {
-      // Base64 veya JWT token payload parse denemesi
-      const decoded = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'))
-      if (decoded && decoded.role) {
-        return {
-          id: decoded.id || 'token_user',
-          role: decoded.role,
-          restaurantId: decoded.restaurantId
-        }
-      }
-    } catch {
-      // Format düz metin veya özel token ise
-      if (token === 'admin_secret_token') {
-        return { id: 'admin-1', role: 'superadmin' }
-      }
-    }
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null
   }
 
-  // 2. Cookie kontrolü
-  const userRoleCookie = req.cookies.get('user_role')?.value
-  const restaurantIdCookie = req.cookies.get('restaurant_id')?.value
+  const token = authHeader.slice(7).trim()
+  const supabase = createClient(supabaseUrl, supabaseAnonKey)
+  const { data: { user }, error } = await supabase.auth.getUser(token)
 
-  if (userRoleCookie) {
-    return {
-      id: req.cookies.get('user_id')?.value || 'cookie_user',
-      role: (userRoleCookie as any) || 'restaurant',
-      restaurantId: restaurantIdCookie
-    }
+  if (error || !user) {
+    return null
   }
 
-  return null
+  // user_metadata or app_metadata contains the role and organization info
+  const role = (user.app_metadata?.role || user.user_metadata?.role || 'restaurant') as 'superadmin' | 'admin' | 'restaurant'
+  const restaurantId = user.user_metadata?.organization_id
+
+  return {
+    id: user.id,
+    role,
+    restaurantId
+  }
 }
 
 /**
  * İstekte geçerli bir oturum olmasını zorunlu kılar.
  * Oturum yoksa 401 Unauthorized yanıtı döner.
  */
-export function requireAuth(req: NextRequest): { user: SessionUser } | { response: NextResponse } {
-  const user = verifySession(req)
+export async function requireAuth(req: NextRequest): Promise<{ user: SessionUser } | { response: NextResponse }> {
+  const user = await verifySession(req)
   if (!user) {
     logSecurityEvent({
       type: 'UNAUTHORIZED_ACCESS_ATTEMPT',
       ip: getClientIp(req),
       endpoint: req.nextUrl.pathname,
-      details: { reason: 'Oturum bulunamadı' }
+      details: { reason: 'Oturum bulunamadı veya geçersiz' }
     })
 
     return {
@@ -78,12 +66,8 @@ export function requireAuth(req: NextRequest): { user: SessionUser } | { respons
   return { user }
 }
 
-/**
- * Yalnızca SuperAdmin veya Admin rolüne izin verir.
- * Yetki yoksa 403 Forbidden döner.
- */
-export function requireAdmin(req: NextRequest): { user: SessionUser } | { response: NextResponse } {
-  const authCheck = requireAuth(req)
+export async function requireAdmin(req: NextRequest): Promise<{ user: SessionUser } | { response: NextResponse }> {
+  const authCheck = await requireAuth(req)
   if ('response' in authCheck) return authCheck
 
   const user = authCheck.user
@@ -108,15 +92,41 @@ export function requireAdmin(req: NextRequest): { user: SessionUser } | { respon
   return { user }
 }
 
+export async function requireSuperAdmin(req: NextRequest): Promise<{ user: SessionUser } | { response: NextResponse }> {
+  const authCheck = await requireAuth(req)
+  if ('response' in authCheck) return authCheck
+
+  const user = authCheck.user
+  if (user.role !== 'superadmin') {
+    logSecurityEvent({
+      type: 'UNAUTHORIZED_ACCESS_ATTEMPT',
+      ip: getClientIp(req),
+      userId: user.id,
+      role: user.role,
+      endpoint: req.nextUrl.pathname,
+      details: { reason: 'Süper Admin yetkisi eksik' }
+    })
+
+    return {
+      response: NextResponse.json(
+        { error: 'Bu işlem yalnızca Süper Adminlere açıktır.', code: 'FORBIDDEN' },
+        { status: 403 }
+      )
+    }
+  }
+
+  return { user }
+}
+
 /**
  * IDOR Koruması: Restoran kullanıcısının yalnızca kendi restoranına ait verilere erişmesini sağlar.
  * Süper Admin kullanıcılar tüm restoranlara erişebilir.
  */
-export function requireOwnership(
+export async function requireOwnership(
   req: NextRequest,
   targetRestaurantId: string
-): { user: SessionUser } | { response: NextResponse } {
-  const authCheck = requireAuth(req)
+): Promise<{ user: SessionUser } | { response: NextResponse }> {
+  const authCheck = await requireAuth(req)
   if ('response' in authCheck) return authCheck
 
   const user = authCheck.user

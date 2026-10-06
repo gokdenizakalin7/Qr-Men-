@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Plus, MoreVertical, Eye, Edit3, Trash2, Globe, EyeOff, QrCode, Smartphone, Sparkles, Camera, Utensils } from 'lucide-react'
 import { Menu, Restaurant } from '@/lib/types'
-import { MOCK_RESTAURANTS, getStoredMenus, setStoredMenus } from '@/lib/mock-data'
+import { getStoredMenus, setStoredMenus } from '@/lib/mock-data'
 import { CreateMenuModal } from '@/components/modals/CreateMenuModal'
 import { QRCodeModal } from '@/components/modals/QRCodeModal'
 import { ScanMenuModal } from '@/components/modals/ScanMenuModal'
 import { motion } from 'framer-motion'
+import { toast } from 'sonner'
+import { authFetch } from '@/lib/api-client'
 
 export function MenusContent() {
   const [currentRestaurant] = useState<Restaurant | null>(() => {
@@ -19,7 +21,7 @@ export function MenusContent() {
       const stored = localStorage.getItem('currentRestaurant')
       if (stored) return JSON.parse(stored)
     }
-    return MOCK_RESTAURANTS[0]
+    return null
   })
 
   const subdomain = currentRestaurant?.subdomain || 'lezzet-ocakbasi'
@@ -29,7 +31,7 @@ export function MenusContent() {
   const loadMenus = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch(`/api/menus/load?subdomain=${subdomain}`)
+      const res = await authFetch(`/api/menus/load?subdomain=${subdomain}`)
       if (res.ok) {
         const data = await res.json()
         setMenus(data.menus || [])
@@ -53,9 +55,9 @@ export function MenusContent() {
   const [selectedQRMenu, setSelectedQRMenu] = useState<any>(null)
   const navigate = useNavigate()
 
-  const syncWithSupabase = async (updatedMenus: Menu[]) => {
+  const syncWithSupabase = async (updatedMenus: Menu[], previousMenus: Menu[]) => {
     try {
-      const res = await fetch('/api/menus/sync', {
+      const res = await authFetch('/api/menus/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -64,26 +66,50 @@ export function MenusContent() {
         })
       })
       if (res.ok) {
-        await loadMenus()
+        toast.success('Değişiklikler başarıyla kaydedildi.')
+      } else {
+        const err = await res.json()
+        toast.error(`Senkronizasyon hatası: ${err.error || 'Bilinmeyen hata'}`)
+        // Rollback
+        setMenus(previousMenus)
+        setStoredMenus(subdomain, previousMenus)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to sync menus with DB:', error)
+      toast.error(`Bağlantı hatası: ${error.message}`)
+      // Rollback
+      setMenus(previousMenus)
+      setStoredMenus(subdomain, previousMenus)
     }
   }
 
   const handleDelete = async (id: string) => {
     if (confirm('Bu menüyü silmek istediğinize emin misiniz?')) {
+      const previousMenus = [...menus]
       try {
-        await fetch('/api/menus/delete', {
+        const updated = menus.filter(menu => menu.id !== id)
+        setMenus(updated)
+        setStoredMenus(subdomain, updated)
+
+        const res = await authFetch('/api/menus/delete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ menuId: id })
         })
-        const updated = menus.filter(menu => menu.id !== id)
-        setMenus(updated)
-        setStoredMenus(subdomain, updated)
-      } catch (err) {
+
+        if (res.ok) {
+          toast.success('Menü silindi.')
+        } else {
+          const err = await res.json()
+          toast.error(`Silme hatası: ${err.error || 'Bilinmeyen hata'}`)
+          setMenus(previousMenus)
+          setStoredMenus(subdomain, previousMenus)
+        }
+      } catch (err: any) {
         console.error('Failed to delete menu', err)
+        toast.error(`Bağlantı hatası: ${err.message}`)
+        setMenus(previousMenus)
+        setStoredMenus(subdomain, previousMenus)
       }
     }
   }
@@ -109,20 +135,22 @@ export function MenusContent() {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
+    const previousMenus = [...menus]
     const updated = [...menus, created]
     setMenus(updated)
     setStoredMenus(subdomain, updated)
-    syncWithSupabase(updated)
+    syncWithSupabase(updated, previousMenus)
     setIsCreateMenuModalOpen(false)
   }
 
   const toggleMenuListing = (id: string) => {
+    const previousMenus = [...menus]
     const updated = menus.map(menu => 
       menu.id === id ? { ...menu, is_listed: !menu.is_listed } : menu
     )
     setMenus(updated)
     setStoredMenus(subdomain, updated)
-    syncWithSupabase(updated)
+    syncWithSupabase(updated, previousMenus)
   }
 
   return (
@@ -295,9 +323,11 @@ export function MenusContent() {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }
+          const previousMenus = [...menus]
           const updated = [...menus, created]
           setMenus(updated)
           setStoredMenus(subdomain, updated)
+          syncWithSupabase(updated, previousMenus)
         }}
       />
 

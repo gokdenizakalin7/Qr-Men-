@@ -7,41 +7,41 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Restaurant } from '@/lib/types'
-import { MOCK_RESTAURANTS } from '@/lib/mock-data'
 import { Check, Store, Wifi, Palette, KeyRound, Share2, Star, MessageSquare } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { sanitizeText, sanitizeMultilineText, sanitizeUrl } from '@/lib/sanitizer'
+import { authFetch } from '@/lib/api-client'
 
 export function SettingsContent() {
   const [activeTab, setActiveTab] = useState<'isletme' | 'sosyal' | 'wifi' | 'marka' | 'sifre'>('isletme')
   const [saveMessage, setSaveMessage] = useState('')
 
-  const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant>(() => {
+  const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant | null>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('currentRestaurant')
       if (stored) return JSON.parse(stored)
     }
-    return MOCK_RESTAURANTS[0]
+    return null
   })
 
   const [businessInfo, setBusinessInfo] = useState({
-    name: currentRestaurant.name,
-    phone: currentRestaurant.businessInfo?.phone || '',
-    address: currentRestaurant.businessInfo?.address || '',
-    city: currentRestaurant.businessInfo?.city || '',
-    wifi_name: currentRestaurant.businessInfo?.wifi_name || '',
-    wifi_password: currentRestaurant.businessInfo?.wifi_password || '',
-    instagramHandle: currentRestaurant.businessInfo?.instagramHandle || '',
-    whatsappNumber: currentRestaurant.businessInfo?.whatsappNumber || '',
-    googleMapsUrl: currentRestaurant.businessInfo?.googleMapsUrl || '',
-    googleReviewUrl: currentRestaurant.businessInfo?.googleReviewUrl || '',
-    workingHours: currentRestaurant.businessInfo?.workingHours || 'Hergün: 10:00 - 00:00'
+    name: currentRestaurant?.name || '',
+    phone: currentRestaurant?.businessInfo?.phone || '',
+    address: currentRestaurant?.businessInfo?.address || '',
+    city: currentRestaurant?.businessInfo?.city || '',
+    wifi_name: currentRestaurant?.businessInfo?.wifi_name || '',
+    wifi_password: currentRestaurant?.businessInfo?.wifi_password || '',
+    instagramHandle: currentRestaurant?.businessInfo?.instagramHandle || '',
+    whatsappNumber: currentRestaurant?.businessInfo?.whatsappNumber || '',
+    googleMapsUrl: currentRestaurant?.businessInfo?.googleMapsUrl || '',
+    googleReviewUrl: currentRestaurant?.businessInfo?.googleReviewUrl || '',
+    workingHours: currentRestaurant?.businessInfo?.workingHours || 'Hergün: 10:00 - 00:00'
   })
 
   const [branding, setBranding] = useState({
-    primaryColor: currentRestaurant.branding?.primaryColor || '#e11d48',
-    bannerUrl: currentRestaurant.branding?.bannerUrl || '',
-    currency: currentRestaurant.currency || '₺'
+    primaryColor: currentRestaurant?.branding?.primaryColor || '#e11d48',
+    bannerUrl: currentRestaurant?.branding?.bannerUrl || '',
+    currency: currentRestaurant?.currency || '₺'
   })
 
   const [newPassword, setNewPassword] = useState('')
@@ -87,7 +87,7 @@ export function SettingsContent() {
 
     try {
       if (updatedRest.subdomain && updatedRest.subdomain !== 'lezzet-ocakbasi') {
-        const res = await fetch('/api/organizations/update', {
+        const res = await authFetch('/api/organizations/update', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

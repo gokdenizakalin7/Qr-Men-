@@ -1,12 +1,16 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '@/lib/auth-middleware'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
+    const authCheck = await requireAuth(request)
+    if ('response' in authCheck) return authCheck.response
+
     const { searchParams } = new URL(request.url)
     const subdomain = searchParams.get('subdomain')
 

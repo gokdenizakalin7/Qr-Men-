@@ -41,13 +41,15 @@ import {
   Loader2
 } from 'lucide-react'
 import { Menu, MenuCategory, MenuItem, Restaurant } from '@/lib/types'
-import { MOCK_RESTAURANTS, mockMenusByRestaurant, getStoredMenus, setStoredMenus } from '@/lib/mock-data'
+import { getStoredMenus, setStoredMenus } from '@/lib/mock-data'
 import { PRESET_MENU_TEMPLATES, MenuTemplate } from '@/lib/menu-templates'
 import { sanitizeText, sanitizeMultilineText, sanitizePrice } from '@/lib/sanitizer'
 import { ScanMenuModal } from '@/components/modals/ScanMenuModal'
 import { motion, AnimatePresence } from 'framer-motion'
+import { toast } from 'sonner'
 import { compressImageFile, IMAGE_PRESETS, formatFileSize } from '@/lib/image-compression'
 import { safeJsonParse } from '@/lib/utils'
+import { authFetch } from '@/lib/api-client'
 
 // KURUMSAL & SEO UYUMLU ANA KATEGORİ REHBERİ
 export const ORDERED_CATEGORY_GROUPS = [
@@ -214,7 +216,7 @@ export function LiveMenuEditor() {
         if (parsed) return parsed
       }
     }
-    return MOCK_RESTAURANTS[0]
+    return null
   })
 
   const subdomain = currentRestaurant?.subdomain || 'lezzet-ocakbasi'
@@ -235,7 +237,7 @@ export function LiveMenuEditor() {
     async function loadFromSupabase() {
       setIsLoading(true)
       try {
-        const res = await fetch(`/api/menus/load?subdomain=${subdomain}`)
+        const res = await authFetch(`/api/menus/load?subdomain=${subdomain}`)
         if (res.ok) {
           const data = await res.json()
           if (data.menus && data.menus.length > 0) {
@@ -351,17 +353,22 @@ export function LiveMenuEditor() {
     setIsTemplateModalOpen(false)
     
     // Asenkron olarak veritabanına kaydet
-    fetch('/api/menus/sync', {
+    authFetch('/api/menus/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ subdomain, menus: [newMenu] })
-    }).then(res => {
+    }).then(async res => {
       if (res.ok) {
         setSavedSuccess(true)
         setTimeout(() => setSavedSuccess(false), 3000)
+        toast.success('Şablon başarıyla uygulandı ve kaydedildi.')
+      } else {
+        const err = await res.json()
+        toast.error(`Kaydetme hatası: ${err.error || 'Bilinmeyen hata'}`)
       }
     }).catch(e => {
       console.error('Failed to sync template menu to Supabase:', e)
+      toast.error(`Bağlantı hatası: ${e.message}`)
     })
   }
 
@@ -392,17 +399,22 @@ export function LiveMenuEditor() {
     setStoredMenus(subdomain, [blankMenu])
     
     // Asenkron olarak veritabanına kaydet
-    fetch('/api/menus/sync', {
+    authFetch('/api/menus/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ subdomain, menus: [blankMenu] })
-    }).then(res => {
+    }).then(async res => {
       if (res.ok) {
         setSavedSuccess(true)
         setTimeout(() => setSavedSuccess(false), 3000)
+        toast.success('Boş menü başarıyla oluşturuldu.')
+      } else {
+        const err = await res.json()
+        toast.error(`Menü oluşturma hatası: ${err.error || 'Bilinmeyen hata'}`)
       }
     }).catch(e => {
       console.error('Failed to sync blank menu to Supabase:', e)
+      toast.error(`Bağlantı hatası: ${e.message}`)
     })
   }
 
@@ -746,19 +758,22 @@ export function LiveMenuEditor() {
     setStoredMenus(subdomain, [menu])
     
     try {
-      const res = await fetch('/api/menus/sync', {
+      const res = await authFetch('/api/menus/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subdomain, menus: [menu] })
       })
-      if (!res.ok) throw new Error('Failed to save to Supabase')
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Failed to save to Supabase')
+      }
       
-      console.log('Menü Supabase veritabanına kaydedildi:', menu)
       setSavedSuccess(true)
       setTimeout(() => setSavedSuccess(false), 2500)
-    } catch (e) {
+      toast.success('Menü başarıyla kaydedildi.')
+    } catch (e: any) {
       console.error(e)
-      alert("Menü kaydedilirken hata oluştu!")
+      toast.error(`Menü kaydedilirken hata oluştu: ${e.message}`)
     }
   }
 
@@ -1571,15 +1586,21 @@ export function LiveMenuEditor() {
           setStoredMenus(subdomain, [newMenu])
           
           try {
-            await fetch('/api/menus/sync', {
+            const res = await authFetch('/api/menus/sync', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ subdomain, menus: [newMenu] })
             })
+            if (!res.ok) {
+              const err = await res.json()
+              throw new Error(err.error || 'Bilinmeyen hata')
+            }
             setSavedSuccess(true)
             setTimeout(() => setSavedSuccess(false), 3000)
-          } catch (e) {
+            toast.success('Taranan menü başarıyla kaydedildi.')
+          } catch (e: any) {
             console.error('Failed to sync scanned menu to Supabase:', e)
+            toast.error(`Senkronizasyon hatası: ${e.message}`)
           }
         }}
       />

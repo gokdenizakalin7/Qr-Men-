@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
-/**
- * OTP (One-Time Password) Doğrulama Endpoint'i
- * Kullanıcının girdiği kodu server'daki kayıtlı kod ile karşılaştırır.
- */
-
-const otpStore = global as unknown as { __otpStore?: Map<string, { code: string; expiresAt: number; attempts: number }> }
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,57 +17,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!otpStore.__otpStore) {
+    const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+    // Supabase OTP Doğrulama
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token: code,
+      type: 'email'
+    })
+
+    if (error || !data.user) {
       return NextResponse.json(
-        { success: false, message: 'Doğrulama kodu bulunamadı. Lütfen yeni kod talep edin.' },
+        { success: false, message: 'Geçersiz veya süresi dolmuş kod. (Hata: ' + (error?.message || 'Bilinmiyor') + ')' },
         { status: 400 }
       )
     }
 
-    const stored = otpStore.__otpStore.get(email)
-
-    if (!stored) {
-      return NextResponse.json(
-        { success: false, message: 'Doğrulama kodu bulunamadı. Lütfen yeni kod talep edin.' },
-        { status: 400 }
-      )
-    }
-
-    // Süre kontrolü
-    if (stored.expiresAt < Date.now()) {
-      otpStore.__otpStore.delete(email)
-      return NextResponse.json(
-        { success: false, message: 'Doğrulama kodunun süresi dolmuş. Lütfen yeni kod talep edin.' },
-        { status: 400 }
-      )
-    }
-
-    // Deneme sayısı kontrolü (maks 5 yanlış deneme)
-    if (stored.attempts >= 5) {
-      otpStore.__otpStore.delete(email)
-      return NextResponse.json(
-        { success: false, message: '5 kez hatalı kod girildi. Lütfen yeni doğrulama kodu talep edin.' },
-        { status: 429 }
-      )
-    }
-
-    // Kod doğrulama
-    if (stored.code !== code) {
-      stored.attempts += 1
-      const remaining = 5 - stored.attempts
-      return NextResponse.json(
-        { success: false, message: `Doğrulama kodu hatalı. (Kalan deneme: ${remaining})` },
-        { status: 400 }
-      )
-    }
-
-    // Başarılı — OTP'yi temizle (tek kullanımlık)
-    otpStore.__otpStore.delete(email)
-
+    // Başarılı
     return NextResponse.json({
       success: true,
       message: 'Doğrulama başarılı.',
-      verified: true
+      verified: true,
+      session: data.session
     })
   } catch (error) {
     console.error('[2FA] OTP doğrulama hatası:', error)

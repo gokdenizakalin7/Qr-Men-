@@ -41,26 +41,40 @@ import { Restaurant, UserRole, UserAccount, Menu, AccountStatus } from '@/lib/ty
 import { MOCK_RESTAURANTS, mockMenusByRestaurant, SYSTEM_USERS } from '@/lib/mock-data'
 import { motion } from 'framer-motion'
 import { clearClientSession } from '@/lib/session'
+import { authFetch } from '@/lib/api-client'
 
 export function AdminDashboard() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<'kullanicilar' | 'menuler' | 'analitik' | 'ayarlar'>('kullanicilar')
 
-  const [restaurants, setRestaurants] = useState<Restaurant[]>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('all_restaurants')
-      if (stored) return JSON.parse(stored)
-    }
-    return MOCK_RESTAURANTS
-  })
+  const [restaurants, setRestaurants] = useState<any[]>([])
+  const [users, setUsers] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const [users, setUsers] = useState<UserAccount[]>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('system_users')
-      if (stored) return JSON.parse(stored)
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true)
+      try {
+        const [orgRes, userRes] = await Promise.all([
+          authFetch('/api/admin/organizations'),
+          authFetch('/api/admin/users')
+        ])
+        if (orgRes.ok) {
+          const orgData = await orgRes.json()
+          setRestaurants(orgData.organizations || [])
+        }
+        if (userRes.ok) {
+          const userData = await userRes.json()
+          setUsers(userData.users || [])
+        }
+      } catch (err) {
+        console.error("Admin fetch error", err)
+      } finally {
+        setIsLoading(false)
+      }
     }
-    return SYSTEM_USERS
-  })
+    fetchData()
+  }, [])
 
   const [searchTerm, setSearchTerm] = useState('')
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false)
@@ -91,10 +105,10 @@ export function AdminDashboard() {
     maintenanceMode: false
   })
 
-  useEffect(() => {
-    localStorage.setItem('all_restaurants', JSON.stringify(restaurants))
-    localStorage.setItem('system_users', JSON.stringify(users))
-  }, [restaurants, users])
+  // useEffect(() => {
+  //   localStorage.setItem('all_restaurants', JSON.stringify(restaurants))
+  //   localStorage.setItem('system_users', JSON.stringify(users))
+  // }, [restaurants, users])
 
   const showNotify = (msg: string) => {
     setNotification(msg)
@@ -114,114 +128,43 @@ export function AdminDashboard() {
   }
 
   // YENİ KULLANICI / RESTORAN OLUŞTURMA (ŞİFREYİ KULLANICI KENDİSİ BELİRLER)
-  const handleCreateUser = (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formName || !formEmail) return
 
-    const newRestId = `rest-${Date.now()}`
-    const newUserId = `user-${Date.now()}`
-    const token = `act_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-
-    // Kullanıcı Kaydı (Aktivasyon Bekliyor)
-    const newUser: UserAccount = {
-      id: newUserId,
-      name: formOwner || formName,
-      email: formEmail,
-      role: formRole,
-      status: 'pending_activation',
-      activationToken: token,
-      restaurantId: formRole === 'restaurant' ? newRestId : undefined,
-      createdAt: new Date().toISOString().split('T')[0]
-    }
-
-    if (formRole === 'restaurant') {
-      const newRestaurant: Restaurant = {
-        id: newRestId,
-        name: formName,
-        ownerName: formOwner || 'İşletme Yetkilisi',
-        subdomain: formSubdomain || `restoran-${Date.now()}`,
-        role: 'restaurant',
-        currency: '₺',
-        status: 'pending_activation', // Aktivasyon bekliyor
-        activationToken: token,
-        createdAt: new Date().toISOString().split('T')[0],
-        credentials: {
-          email: formEmail,
-        },
-        businessInfo: {
-          phone: formPhone || '0 (555) 000 00 00',
-          address: 'Adres belirtilmedi',
-          city: formCity,
-          state: 'Merkez',
-          zipcode: '34000',
-          wifi_name: `${formName.replace(/\s+/g, '')}_Misafir`,
-          wifi_password: '',
-          hours: {
-            pazartesi: { open: '09:00', close: '23:00', isOpen: true },
-            sali: { open: '09:00', close: '23:00', isOpen: true },
-            carsamba: { open: '09:00', close: '23:00', isOpen: true },
-            persembe: { open: '09:00', close: '23:00', isOpen: true },
-            cuma: { open: '09:00', close: '00:00', isOpen: true },
-            cumartesi: { open: '09:00', close: '00:00', isOpen: true },
-            pazar: { open: '09:00', close: '23:00', isOpen: true },
+    try {
+      if (formRole === 'restaurant') {
+        const res = await authFetch('/api/admin/organizations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formName,
+            subdomain: formSubdomain || `restoran-${Date.now()}`,
+            business_phone: formPhone
+          })
+        })
+        if (res.ok) {
+          showNotify('Organizasyon (Restoran) başarıyla oluşturuldu.')
+          // Yeniden yükle
+          const orgRes = await authFetch('/api/admin/organizations')
+          if (orgRes.ok) {
+            const orgData = await orgRes.json()
+            setRestaurants(orgData.organizations || [])
           }
-        },
-        branding: {
-          primaryColor: '#e11d48',
-          currency: '₺',
-          coverUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=400&fit=crop'
-        },
-        tables: [
-          { id: `tbl-${Date.now()}-1`, table_number: 1, table_name: 'Masa 1', qr_url: '', views: 0 },
-        ]
-      }
-
-      mockMenusByRestaurant[newRestaurant.subdomain] = [
-        {
-          id: `menu-${Date.now()}`,
-          name: 'Genel Menü',
-          description: 'Günlük lezzetlerimiz',
-          image_url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=400&fit=crop',
-          is_listed: true,
-          available_days: [1, 2, 3, 4, 5, 6, 7],
-          layout: 'grid',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          categories: [
-            {
-              id: `cat-${Date.now()}-1`,
-              name: 'Başlangıçlar',
-              is_active: true,
-              display_order: 1,
-              items: []
-            }
-          ]
+        } else {
+          showNotify('Hata oluştu.')
         }
-      ]
-
-      setRestaurants(prev => [newRestaurant, ...prev])
+      }
+    } catch (e) {
+      showNotify('Bağlantı hatası.')
     }
 
-    setUsers(prev => [newUser, ...prev])
     setIsAddUserModalOpen(false)
-
-    // Aktivasyon Linkini göster
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
-    const activationLink = `${origin}/activate?token=${token}`
-
-    setActivationModalData({
-      restaurantName: formName,
-      email: formEmail,
-      activationLink
-    })
-
     setFormName('')
     setFormOwner('')
     setFormEmail('')
     setFormPhone('')
-    setFormSubdomain('')
-    setFormRole('restaurant')
-    showNotify('Aktivasyon linki oluşturuldu!')
+    setFormCity('İstanbul')
   }
 
   const toggleStatus = (id: string) => {

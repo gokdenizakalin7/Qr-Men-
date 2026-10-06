@@ -1,23 +1,23 @@
-# Stage 1: Install dependencies
-FROM node:18-alpine AS deps
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-
-# Stage 2: Build the application
-FROM node:18-alpine AS builder
+# Stage 1: Build the application
+FROM node:22-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
 
-# Stage 3: Production runtime
-FROM node:18-alpine AS runner
+# Stage 2: Production runtime
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# Required Environment Variables (must be passed at runtime)
+# ENV NEXT_PUBLIC_SUPABASE_URL=...
+# ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+# ENV SUPABASE_SERVICE_ROLE_KEY=...
+# ENV GEMINI_API_KEY=...
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs

@@ -57,10 +57,22 @@ export function middleware(request: NextRequest) {
     'http://localhost:3000',
     'http://127.0.0.1:3000'
   ]
-  const isAllowedOrigin = !!(origin && (
-    allowedOrigins.includes(origin) ||
-    origin.endsWith('.qolay.com')
-  ))
+  
+  let isAllowedOrigin = false
+  if (origin) {
+    if (allowedOrigins.includes(origin)) {
+      isAllowedOrigin = true
+    } else {
+      try {
+        const originUrl = new URL(origin)
+        if (originUrl.hostname.endsWith('.qolay.com')) {
+          isAllowedOrigin = true
+        }
+      } catch (e) {
+        // Invalid origin URL
+      }
+    }
+  }
 
   if (pathname.startsWith('/api')) {
     if (request.method === 'OPTIONS') {
@@ -128,20 +140,20 @@ export function middleware(request: NextRequest) {
   // XSS Koruması
   response.headers.set('X-XSS-Protection', '1; mode=block')
 
-  // Content-Security-Policy (CSP)
+  // Content-Security-Policy (CSP) - Raporlama modunda (Report-Only) ve sıkılaştırılmış
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'unsafe-inline' 'unsafe-eval' https:;
+    script-src 'self' 'unsafe-inline';
     style-src 'self' 'unsafe-inline' https:;
-    img-src 'self' data: blob: https://images.unsplash.com https://*.googleusercontent.com https://*.unsplash.com;
+    img-src 'self' data: blob: https://images.unsplash.com https://*.googleusercontent.com https://*.unsplash.com https://*.supabase.co;
     font-src 'self' data: https:;
-    connect-src 'self' https://generativelanguage.googleapis.com https://*.googleapis.com;
+    connect-src 'self' https://generativelanguage.googleapis.com https://*.googleapis.com https://*.supabase.co;
     frame-ancestors 'self';
     base-uri 'self';
     form-action 'self';
   `.replace(/\s{2,}/g, ' ').trim()
 
-  response.headers.set('Content-Security-Policy', cspHeader)
+  response.headers.set('Content-Security-Policy-Report-Only', cspHeader)
 
   // CORS Yanıt Başlıkları
   if (pathname.startsWith('/api') && isAllowedOrigin && origin) {

@@ -30,8 +30,6 @@ import {
   Wine,
   Leaf
 } from 'lucide-react'
-import { mockMenusByRestaurant, MOCK_RESTAURANTS } from '@/lib/mock-data'
-import { MenuItem, Menu, Restaurant, ProductTag } from '@/lib/types'
 import { PublicTermsOfServiceModal } from '@/components/modals/PublicTermsOfServiceModal'
 import { PublicPrivacyPolicyModal } from '@/components/modals/PublicPrivacyPolicyModal'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -140,14 +138,9 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
 
   const targetSubdomain = restaurantSubdomain || paramSubdomain || 'lezzet-ocakbasi'
 
-  const [restaurant, setRestaurant] = useState<Restaurant>(() => {
-    if (typeof window !== 'undefined') {
-      const all: Restaurant[] = JSON.parse(localStorage.getItem('all_restaurants') || '[]')
-      const found = all.find(r => r.subdomain === targetSubdomain)
-      if (found) return found
-    }
-    return MOCK_RESTAURANTS.find(r => r.subdomain === targetSubdomain) || MOCK_RESTAURANTS[0]
-  })
+  const [restaurant, setRestaurant] = useState<any>(null)
+  const [restaurantError, setRestaurantError] = useState(false)
+  const [isLoadingRestaurant, setIsLoadingRestaurant] = useState(true)
 
   // Dil Desteği (tr, en, ar, ru)
   const [lang, setLang] = useState<'tr' | 'en' | 'ar' | 'ru'>('tr')
@@ -201,28 +194,47 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    async function loadMenus() {
+    async function loadRestaurant() {
       try {
-        const res = await fetch(`/api/menus/load?subdomain=${targetSubdomain}`)
+        const res = await fetch(`/api/public/restaurant?subdomain=${targetSubdomain}`)
         if (res.ok) {
           const data = await res.json()
-          if (data.menus && data.menus.length > 0) {
-            setMenus(data.menus)
-            setIsLoading(false)
-            return
+          setRestaurant(data)
+        } else {
+          setRestaurantError(true)
+        }
+      } catch (err) {
+        setRestaurantError(true)
+      } finally {
+        setIsLoadingRestaurant(false)
+      }
+    }
+    loadRestaurant()
+  }, [targetSubdomain])
+
+  useEffect(() => {
+    async function loadMenus() {
+      if (!restaurant) return;
+      try {
+        const res = await fetch(`/api/public/menus?orgId=${restaurant.id}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data && data.length > 0) {
+            setMenus(data)
           }
         }
       } catch (err) {
         console.error("Failed to load real menus", err)
+      } finally {
+        setIsLoading(false)
       }
-      
-      // Fallback to mock data if API fails or returns no menus
-      const fallbackMenus = mockMenusByRestaurant[targetSubdomain] || mockMenusByRestaurant['lezzet-ocakbasi'] || []
-      setMenus(fallbackMenus)
+    }
+    if (restaurant && !restaurantError) {
+      loadMenus()
+    } else if (restaurantError) {
       setIsLoading(false)
     }
-    loadMenus()
-  }, [targetSubdomain])
+  }, [restaurant, restaurantError])
 
   const activeMenu = menus[0]
 
@@ -293,18 +305,28 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
   }
 
   const copyWifi = () => {
-    if (restaurant.businessInfo?.wifi_password) {
-      navigator.clipboard.writeText(restaurant.businessInfo.wifi_password)
+    if (restaurant?.wifi_password) {
+      navigator.clipboard.writeText(restaurant.wifi_password)
       setWifiCopied(true)
       setTimeout(() => setWifiCopied(false), 2000)
     }
   }
 
-  if (isLoading) {
+  if (isLoadingRestaurant || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="text-gray-500 font-medium">Menü Yükleniyor...</p>
+        <p className="text-gray-500 font-medium">Yükleniyor...</p>
+      </div>
+    )
+  }
+
+  if (restaurantError || !restaurant) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+        <AlertCircle className="h-16 w-16 text-gray-400 mb-4" />
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Restoran Bulunamadı</h2>
+        <p className="text-gray-500 text-center max-w-md">Aradığınız menüye ulaşılamıyor veya böyle bir restoran sistemimizde kayıtlı değil.</p>
       </div>
     )
   }
@@ -325,8 +347,8 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
               initial={{ scale: 1.1, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               transition={{ duration: 1.5, ease: "easeOut" }}
-              src={restaurant.branding?.bannerUrl || activeMenu.image_url} 
-              alt={restaurant.name}
+              src={restaurant?.cover_url || activeMenu?.image_url} 
+              alt={restaurant?.name}
               className="w-full h-full object-cover opacity-50" 
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-6 sm:p-12">
@@ -337,11 +359,11 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
                 className="max-w-2xl"
               >
                 <h2 className="text-4xl sm:text-6xl font-black tracking-tighter text-white leading-none mb-3">
-                  {restaurant.name}
+                  {restaurant?.name}
                 </h2>
-                {restaurant.businessInfo?.address && (
+                {restaurant?.address && (
                   <p className="text-sm sm:text-base text-white/90 font-medium flex items-center">
-                    <MapPin className="h-4 w-4 mr-2" style={{ color: primaryColor }} /> {restaurant.businessInfo.address}
+                    <MapPin className="h-4 w-4 mr-2" style={{ color: primaryColor }} /> {restaurant.address} {restaurant.city && `- ${restaurant.city}`}
                   </p>
                 )}
               </motion.div>
@@ -377,32 +399,7 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
 
         <main className="container mx-auto px-4 py-8 max-w-5xl space-y-12 mb-24">
           
-          {/* HIZLI SOSYAL MEDYA BARİ */}
-          <div className="flex gap-2 sm:gap-3 w-full">
-            {restaurant.businessInfo?.instagramHandle && (
-              <a
-                href={`https://instagram.com/${restaurant.businessInfo.instagramHandle}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex-1 px-2 py-3 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 rounded-xl shadow-[0_4px_15px_rgba(236,72,153,0.2)] flex items-center justify-center gap-1.5 text-white font-bold transition-all hover:scale-[1.02]"
-              >
-                <Instagram className="h-3.5 w-3.5 shrink-0" />
-                <span className="text-[10px] sm:text-xs">Instagram'da Bizi Takip Et</span>
-              </a>
-            )}
-            
-            {restaurant.businessInfo?.googleMapsUrl && (
-              <a
-                href={restaurant.businessInfo.googleMapsUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="flex-1 px-2 py-3 bg-white dark:bg-[#2c2c2e] rounded-xl border border-gray-100 dark:border-white/5 shadow-[0_4px_15px_rgba(0,0,0,0.03)] flex items-center justify-center gap-1.5 text-gray-900 dark:text-white font-bold transition-all hover:scale-[1.02]"
-              >
-                <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500 shrink-0" />
-                <span className="text-[10px] sm:text-xs">Google'da Bizi Puanla</span>
-              </a>
-            )}
-          </div>
+          {/* HIZLI SOSYAL MEDYA BARİ (Kaldirildi, mock veriye dayaliydi) */}
 
 
 
@@ -445,10 +442,10 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
 
           {/* Dergi Bento Izgarası */}
           <div className="space-y-16 pt-4 pb-12">
-            {filteredCategories.length === 0 ? (
+            {!activeMenu || filteredCategories.length === 0 ? (
               <div className="text-center py-20 bg-white dark:bg-[#2c2c2e] rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] text-gray-400 dark:text-zinc-500 text-base font-medium">
-                <Search className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                {t.noItemsFound}
+                <Utensils className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                {!activeMenu ? "Menü çok yakında." : t.noItemsFound}
               </div>
             ) : (
               filteredCategories.map(category => (

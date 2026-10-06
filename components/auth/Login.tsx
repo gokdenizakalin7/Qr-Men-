@@ -14,9 +14,6 @@ export function Login() {
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
 
-  // GOD USER (Süper Admin) e-postası
-  const SUPER_ADMIN_EMAIL = 'gokdenizakalin7@gmail.com' 
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -55,35 +52,40 @@ export function Login() {
         refresh_token: authData.session.refresh_token
       })
 
-      const userEmail = authData.user.email?.toLowerCase()
+      // Yetkileri /api/auth/me uç noktasından çek
+      const meRes = await fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${authData.session.access_token}` }
+      })
+      const meData = await meRes.json()
 
-      // 2. God User Kontrolü
-      if (userEmail === SUPER_ADMIN_EMAIL.toLowerCase()) {
-        setClientSession({ role: 'superadmin', userId: authData.user.id })
-        localStorage.setItem('is_admin', 'true')
+      if (!meRes.ok || meData.error) {
+        setError(meData.error || 'Kullanıcı yetkileri alınamadı.')
+        await supabase.auth.signOut()
+        setIsLoading(false)
+        return
+      }
+
+      // God User veya Admin Kontrolü
+      if (meData.role === 'superadmin' || meData.role === 'admin') {
+        setClientSession({ role: meData.role, userId: meData.id })
+        localStorage.setItem('user_role', meData.role)
         window.location.href = '/admin'
         return
       }
 
-      // 3. Normal Restoran Kullanıcısı Kontrolü
-      const { data: memberData, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id, role, organizations(*)')
-        .eq('user_id', authData.user.id)
-        .single()
-
-      if (memberData && memberData.organizations) {
-        const org = memberData.organizations as any
+      // Normal Restoran Kullanıcısı Kontrolü
+      if (meData.organization) {
+        const org = meData.organization
         
         localStorage.setItem('currentRestaurant', JSON.stringify({
           subdomain: org.subdomain,
           name: org.name,
           id: org.id
         }))
-        localStorage.setItem('user_role', memberData.role)
+        localStorage.setItem('user_role', meData.role)
         localStorage.removeItem('is_admin')
         
-        setClientSession({ role: memberData.role, restaurant: org, userId: authData.user.id })
+        setClientSession({ role: meData.role, restaurant: org, userId: meData.id })
         window.location.href = '/dashboard'
       } else {
         setError('Hesabınıza atanmış bir restoran bulunamadı. Lütfen yönetici ile iletişime geçin.')

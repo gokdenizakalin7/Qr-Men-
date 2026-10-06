@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ShieldAlert, Lock, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { authFetch } from '@/lib/api-client'
 
 /**
  * Enterprise Admin Rota Kalkanı (AdminGuard)
@@ -18,13 +19,36 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const role = localStorage.getItem('user_role')
-    const isAdminFlag = localStorage.getItem('is_admin') === 'true' || localStorage.getItem('is_admin_impersonating') === 'true'
-    const isAdmin = role === 'superadmin' || role === 'admin' || isAdminFlag
+    let isMounted = true
+    const checkAdminStatus = async () => {
+      try {
+        const res = await authFetch('/api/auth/me')
+        if (res.ok) {
+          const user = await res.json()
+          if (isMounted) {
+            const isAdmin = user.role === 'superadmin' || user.role === 'admin'
+            if (!isAdmin) {
+              setIsAuthorized(false)
+              startRedirect(user.role)
+            } else {
+              setIsAuthorized(true)
+            }
+          }
+        } else {
+          if (isMounted) {
+            setIsAuthorized(false)
+            startRedirect('restaurant')
+          }
+        }
+      } catch (e) {
+        if (isMounted) {
+          setIsAuthorized(false)
+          startRedirect('restaurant')
+        }
+      }
+    }
 
-    if (!isAdmin) {
-      setIsAuthorized(false)
-      // 3 saniye sonra otomatik restoran paneline yönlendir
+    const startRedirect = (role: string) => {
       const timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -35,11 +59,11 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
           return prev - 1
         })
       }, 1000)
-
-      return () => clearInterval(timer)
-    } else {
-      setIsAuthorized(true)
     }
+
+    checkAdminStatus()
+
+    return () => { isMounted = false }
   }, [navigate])
 
   if (isAuthorized === null) {
@@ -104,15 +128,29 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const role = localStorage.getItem('user_role')
-    const currentRest = localStorage.getItem('currentRestaurant')
-
-    if (!role && !currentRest) {
-      setIsAuthenticated(false)
-      navigate('/login')
-    } else {
-      setIsAuthenticated(true)
+    let isMounted = true
+    const checkAuthStatus = async () => {
+      try {
+        const res = await authFetch('/api/auth/me')
+        if (isMounted) {
+          if (res.ok) {
+            setIsAuthenticated(true)
+          } else {
+            setIsAuthenticated(false)
+            navigate('/login')
+          }
+        }
+      } catch (e) {
+        if (isMounted) {
+          setIsAuthenticated(false)
+          navigate('/login')
+        }
+      }
     }
+
+    checkAuthStatus()
+
+    return () => { isMounted = false }
   }, [navigate])
 
   if (isAuthenticated === null) {

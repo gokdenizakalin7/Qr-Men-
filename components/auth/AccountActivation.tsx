@@ -45,12 +45,6 @@ export function AccountActivation() {
 
     if (matchedRest || matchedUser) {
       setTargetAccount({ restaurant: matchedRest, user: matchedUser })
-    } else if (!token) {
-      // Token yoksa ama test için demo olarak ilk bekleyen hesabı bul
-      const pendingRest = allRestaurants.find(r => r.status === 'pending_activation')
-      if (pendingRest) {
-        setTargetAccount({ restaurant: pendingRest })
-      }
     }
 
     setLoading(false)
@@ -81,8 +75,7 @@ export function AccountActivation() {
           return {
             ...r,
             status: 'active' as const,
-            activationToken: undefined,
-            credentials: { ...r.credentials, password }
+            activationToken: undefined
           }
         }
         return r
@@ -90,7 +83,7 @@ export function AccountActivation() {
       localStorage.setItem('all_restaurants', JSON.stringify(updatedList))
       
       // Oturumu başlat
-      const activatedRest = { ...rest, status: 'active' as const, credentials: { ...rest.credentials, password } }
+      const activatedRest = { ...rest, status: 'active' as const }
       localStorage.setItem('currentRestaurant', JSON.stringify(activatedRest))
       localStorage.setItem('user_role', 'restaurant')
     }
@@ -103,8 +96,7 @@ export function AccountActivation() {
           return {
             ...u,
             status: 'active' as const,
-            activationToken: undefined,
-            password
+            activationToken: undefined
           }
         }
         return u
