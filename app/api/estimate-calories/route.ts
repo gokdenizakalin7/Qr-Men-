@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limiter'
 import { sanitizeText } from '@/lib/sanitizer'
 import { logSecurityEvent } from '@/lib/security-logger'
+import { requireUser } from '@/lib/auth-middleware'
 
 export const maxDuration = 30
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req)
+
+  // Oturum zorunlu (Gemini maliyetini yetkisiz kullanıma karşı koru)
+  const auth = await requireUser(req)
+  if ('response' in auth) return auth.response
 
   // Rate Limit: 1 dakikada en fazla 30 kalori tahmini
   const rateLimitKey = `calorie_estimate_${ip}`

@@ -90,9 +90,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Senkronizasyon sırasında veritabanı hatası oluştu.' }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, idMap })
   } catch (err: any) {
-    console.error("Sync error:", err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error('Sync error:', err)
+    return NextResponse.json({ error: 'Menü kaydedilemedi.' }, { status: 500 })
   }
 }
