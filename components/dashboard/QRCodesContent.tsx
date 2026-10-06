@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -90,9 +91,7 @@ export function QRCodesContent() {
     return `${window.location.origin}/menu/${subdomain}?table=${encodeURIComponent(tableName)}`
   }
 
-  const getQRImageUrl = (data: string, size = 300) => {
-    return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`
-  }
+
 
   const handleCopyLink = (text: string, id: string) => {
     navigator.clipboard.writeText(text)
@@ -165,11 +164,12 @@ export function QRCodesContent() {
       <Card className="bg-white border-2 border-primary/20 shadow-sm overflow-hidden">
         <div className="p-5 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center space-x-4">
-            <div className="p-3 bg-white border-2 border-gray-200 rounded-2xl shadow-xs shrink-0">
-              <img 
-                src={getQRImageUrl(getTableLink('Genel Menü'), 160)} 
-                alt="Genel QR" 
-                className="w-28 h-28 object-contain"
+            <div className="p-3 bg-white border-2 border-gray-200 rounded-2xl shadow-xs shrink-0 flex items-center justify-center w-32 h-32">
+              <QRCodeSVG 
+                value={getTableLink('Genel Menü')}
+                size={112}
+                level="M"
+                includeMargin={false}
               />
             </div>
             <div className="space-y-1.5">
@@ -256,11 +256,14 @@ export function QRCodesContent() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
-                        <img 
-                          src={getQRImageUrl(tableUrl, 80)} 
-                          alt={table.name} 
-                          className="w-9 h-9 rounded border bg-white p-0.5" 
-                        />
+                        <div className="w-9 h-9 rounded border bg-white p-0.5 flex items-center justify-center shrink-0">
+                          <QRCodeSVG 
+                            value={tableUrl}
+                            size={32}
+                            level="M"
+                            includeMargin={false}
+                          />
+                        </div>
                         <button
                           onClick={() => handleCopyLink(tableUrl, table.id)}
                           className="text-[11px] text-gray-500 hover:text-primary flex items-center font-mono"
@@ -424,11 +427,12 @@ export function QRCodesContent() {
                 </div>
 
                 {/* QR Kod Çerçevesi */}
-                <div className="p-3 bg-white rounded-2xl border-2 border-gray-200 shadow-md">
-                  <img 
-                    src={getQRImageUrl(getTableLink(activePrintTable?.name || ''), 220)} 
-                    alt="QR" 
-                    className="w-44 h-44 object-contain"
+                <div className="p-3 bg-white rounded-2xl border-2 border-gray-200 shadow-md flex items-center justify-center w-[176px] h-[176px]">
+                  <QRCodeSVG 
+                    value={getTableLink(activePrintTable?.name || '')}
+                    size={152}
+                    level="Q"
+                    includeMargin={false}
                   />
                 </div>
 
@@ -475,11 +479,12 @@ export function QRCodesContent() {
                   </span>
                 </div>
 
-                <div className="p-2 bg-white rounded-xl border shadow-xs">
-                  <img 
-                    src={getQRImageUrl(getTableLink(activePrintTable?.name || ''), 180)} 
-                    alt="QR" 
-                    className="w-32 h-32 object-contain"
+                <div className="p-2 bg-white rounded-xl border shadow-xs flex items-center justify-center w-36 h-36">
+                  <QRCodeSVG 
+                    value={getTableLink(activePrintTable?.name || '')}
+                    size={128}
+                    level="Q"
+                    includeMargin={false}
                   />
                 </div>
 
@@ -510,11 +515,14 @@ export function QRCodesContent() {
                       >
                         {tbl.name}
                       </span>
-                      <img 
-                        src={getQRImageUrl(getTableLink(tbl.name), 120)} 
-                        alt={tbl.name} 
-                        className="w-24 h-24 bg-white p-1 rounded border object-contain"
-                      />
+                      <div className="w-24 h-24 bg-white p-1 rounded border flex items-center justify-center">
+                        <QRCodeSVG 
+                          value={getTableLink(tbl.name)}
+                          size={88}
+                          level="M"
+                          includeMargin={false}
+                        />
+                      </div>
                       <span className="text-[9px] text-gray-600 font-bold">Menü İçin Okutun</span>
                     </div>
                   ))}

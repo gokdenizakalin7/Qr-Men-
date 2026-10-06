@@ -10,10 +10,10 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { id, name, currency, businessInfo, branding } = body
+    const { subdomain, id, name, currency, businessInfo, branding } = body
 
-    if (!id) {
-      return NextResponse.json({ error: 'Organization ID is required' }, { status: 400 })
+    if (!subdomain && !id) {
+      return NextResponse.json({ error: 'Organization ID or Subdomain is required' }, { status: 400 })
     }
 
     // Map frontend fields to DB columns
@@ -37,12 +37,15 @@ export async function POST(request: Request) {
       if (branding.bannerUrl !== undefined) updateData.cover_url = branding.bannerUrl
     }
 
-    const { data, error } = await supabase
-      .from('organizations')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single()
+    let query = supabase.from('organizations').update(updateData)
+    
+    if (subdomain) {
+      query = query.eq('subdomain', subdomain)
+    } else {
+      query = query.eq('id', id)
+    }
+    
+    const { data, error } = await query.select().single()
 
     if (error) throw error
 

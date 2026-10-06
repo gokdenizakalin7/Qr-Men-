@@ -2,11 +2,7 @@
 
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { QrCode, Loader2 } from 'lucide-react'
+import { QrCode, Loader2, ArrowRight, Lock, Mail, ChefHat } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { setClientSession } from '@/lib/session'
 import { supabase } from '@/lib/supabase'
@@ -28,7 +24,6 @@ export function Login() {
 
     try {
       // 1. Supabase'e doğrudan değil, kendi arka ucumuz (API) üzerinden bağlanıyoruz.
-      // Bu, Safari/VPN/Adblocker gibi tarayıcı engellerini (Failed to fetch) %100 aşar!
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -71,7 +66,6 @@ export function Login() {
       }
 
       // 3. Normal Restoran Kullanıcısı Kontrolü
-      // Hangi restorana ait olduğunu organization_members tablosundan bul
       const { data: memberData, error: memberError } = await supabase
         .from('organization_members')
         .select('organization_id, role, organizations(*)')
@@ -81,7 +75,6 @@ export function Login() {
       if (memberData && memberData.organizations) {
         const org = memberData.organizations as any
         
-        // Frontend'in eski mock sistemini bozmamak için veriyi localstorage'a formatlı koyuyoruz
         localStorage.setItem('currentRestaurant', JSON.stringify({
           subdomain: org.subdomain,
           name: org.name,
@@ -93,7 +86,6 @@ export function Login() {
         setClientSession({ role: memberData.role, restaurant: org, userId: authData.user.id })
         window.location.href = '/dashboard'
       } else {
-        // Kullanıcının atanmış bir restoranı yok
         setError('Hesabınıza atanmış bir restoran bulunamadı. Lütfen yönetici ile iletişime geçin.')
         await supabase.auth.signOut()
       }
@@ -107,86 +99,119 @@ export function Login() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.4 }}
-    >
-      <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 py-12">
-        <div className="w-full max-w-md space-y-4">
-          <div className="text-center">
-            <Link to="/" className="inline-flex items-center text-primary font-extrabold text-2xl mb-1">
-              <QrCode className="h-7 w-7 mr-2" />
-              QR Chef
-            </Link>
-          </div>
-
-          <Card className="w-full shadow-lg border-0 bg-white overflow-hidden">
-            <AnimatePresence mode="wait">
-                <motion.div
-                  key="credentials"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <CardHeader className="space-y-1 text-center pb-3">
-                    <CardTitle className="text-2xl font-bold">Giriş Yap</CardTitle>
-                    <CardDescription>Yönetim paneline erişmek için bilgilerinizi girin</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <form onSubmit={handleLogin} className="space-y-4">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="email">E-posta Adresi</Label>
-                        <Input
-                          id="email"
-                          placeholder="ad@ornek.com"
-                          required
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="password">Şifre</Label>
-                        <Input
-                          id="password"
-                          required
-                          type="password"
-                          placeholder="••••••••"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                        />
-                      </div>
-
-                      {error && (
-                        <div className="p-3 bg-red-50 rounded-lg border border-red-200 text-xs text-red-700 space-y-2">
-                          <p>{error}</p>
-                        </div>
-                      )}
-
-                      <Button 
-                        type="submit" 
-                        className="w-full font-semibold"
-                        disabled={isLoading}
-                      >
-                        {isLoading ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Giriş Yapılıyor...
-                          </>
-                        ) : (
-                          'Giriş Yap'
-                        )}
-                      </Button>
-                    </form>
-                  </CardContent>
-                </motion.div>
-            </AnimatePresence>
-          </Card>
-        </div>
+    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-black font-sans">
+      {/* Background Image & Overlay */}
+      <div 
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: 'url("https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=2070&auto=format&fit=crop")'
+        }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/40 to-black/70 backdrop-blur-[2px]" />
       </div>
-    </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 30, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -20, scale: 0.95 }}
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        className="relative z-10 w-full max-w-[420px] px-6"
+      >
+        <div className="text-center mb-10">
+          <motion.div 
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 20 }}
+            className="relative inline-flex items-center justify-center w-24 h-24 rounded-[28px] bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl mb-6"
+          >
+            <QrCode className="h-12 w-12 text-white" />
+            <div className="absolute -top-4 -right-3 bg-black/50 backdrop-blur-md rounded-full p-1 border border-white/10">
+              <ChefHat className="h-8 w-8 text-white" />
+            </div>
+          </motion.div>
+          <h1 className="text-4xl font-extrabold text-white tracking-tight mb-2">QR Chef</h1>
+          <p className="text-white/60 font-medium text-lg">Restoran Yönetim Paneli</p>
+        </div>
+
+        {/* Glassmorphism Card */}
+        <div className="bg-white/10 backdrop-blur-2xl border border-white/20 p-8 rounded-[32px] shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]">
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-white/70 uppercase tracking-wider pl-1">E-Posta Adresi</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-white/40" />
+                  </div>
+                  <input
+                    id="email"
+                    placeholder="ad@ornek.com"
+                    required
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-black/20 border border-white/10 text-white placeholder-white/30 rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent transition-all shadow-inner"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-white/70 uppercase tracking-wider pl-1">Şifre</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-white/40" />
+                  </div>
+                  <input
+                    id="password"
+                    placeholder="••••••••"
+                    required
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-black/20 border border-white/10 text-white placeholder-white/30 rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent transition-all shadow-inner"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <AnimatePresence>
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="p-4 mt-2 bg-red-500/20 border border-red-500/30 rounded-2xl text-red-100 text-sm font-medium text-center backdrop-blur-md">
+                    {error}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="group relative w-full flex justify-center items-center py-4 px-4 border border-transparent text-base font-extrabold rounded-2xl text-black bg-white hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-white/30 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100 mt-2"
+            >
+              {isLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin text-black" />
+              ) : (
+                <>
+                  Giriş Yap
+                  <ArrowRight className="ml-2 h-5 w-5 opacity-70 group-hover:translate-x-1 transition-transform text-black" />
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+
+        <div className="mt-10 text-center">
+          <p className="text-sm font-medium text-white/40">
+            2026 © QR Chef Yönetim Sistemi
+          </p>
+        </div>
+      </motion.div>
+    </div>
   )
 }

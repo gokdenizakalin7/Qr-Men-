@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -203,6 +203,9 @@ export const DEFAULT_CATALOG_FALLBACK = [
 
 export function LiveMenuEditor() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const menuIdParam = searchParams.get('menu')
+
   const [currentRestaurant] = useState<Restaurant | null>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('currentRestaurant')
@@ -215,44 +218,47 @@ export function LiveMenuEditor() {
   })
 
   const subdomain = currentRestaurant?.subdomain || 'lezzet-ocakbasi'
+  const [isLoading, setIsLoading] = useState(true)
+
   const [menu, setMenu] = useState<Menu | null>(() => {
     const list = getStoredMenus(subdomain)
-    return list.length > 0 ? list[0] : null
+    if (list.length === 0) return null
+    if (menuIdParam) {
+      const found = list.find(m => m.id === menuIdParam)
+      if (found) return found
+    }
+    return list[0]
   })
 
   // SUPABASE'TEN YÜKLEME
   useEffect(() => {
     async function loadFromSupabase() {
+      setIsLoading(true)
       try {
         const res = await fetch(`/api/menus/load?subdomain=${subdomain}`)
         if (res.ok) {
           const data = await res.json()
           if (data.menus && data.menus.length > 0) {
-            setMenu(data.menus[0])
+            if (menuIdParam) {
+              const found = data.menus.find((m: Menu) => m.id === menuIdParam)
+              setMenu(found || data.menus[0])
+            } else {
+              setMenu(data.menus[0])
+            }
             setStoredMenus(subdomain, data.menus)
           } else {
-            // Veritabanında menü yoksa, sıfırdan bir şablon veya boş menü oluştur
-            const blankMenu: Menu = {
-              id: 'new-menu',
-              name: 'Yeni Menü',
-              description: 'Açıklama ekleyin...',
-              image_url: '',
-              is_listed: true,
-              layout: 'grid',
-              available_days: [1,2,3,4,5,6,7],
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              categories: []
-            }
-            setMenu(blankMenu)
+            // Veritabanında menü yoksa boş state'i göster (menu: null kalır)
+            setMenu(null)
           }
         }
       } catch (err) {
-        console.error("Supabase'den menü yüklenemedi:", err)
+        console.error(err)
+      } finally {
+        setIsLoading(false)
       }
     }
     loadFromSupabase()
-  }, [subdomain])
+  }, [subdomain, menuIdParam])
 
   const [primaryColor, setPrimaryColor] = useState(currentRestaurant?.branding?.primaryColor || '#e11d48')
   
@@ -343,8 +349,20 @@ export function LiveMenuEditor() {
     setStoredMenus(subdomain, [newMenu])
     setPrimaryColor(tmpl.color)
     setIsTemplateModalOpen(false)
-    setSavedSuccess(true)
-    setTimeout(() => setSavedSuccess(false), 3000)
+    
+    // Asenkron olarak veritabanına kaydet
+    fetch('/api/menus/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subdomain, menus: [newMenu] })
+    }).then(res => {
+      if (res.ok) {
+        setSavedSuccess(true)
+        setTimeout(() => setSavedSuccess(false), 3000)
+      }
+    }).catch(e => {
+      console.error('Failed to sync template menu to Supabase:', e)
+    })
   }
 
   // SIFIRDAN BOŞ MENÜ OLUŞTUR
@@ -372,8 +390,20 @@ export function LiveMenuEditor() {
     }
     setMenu(blankMenu)
     setStoredMenus(subdomain, [blankMenu])
-    setSavedSuccess(true)
-    setTimeout(() => setSavedSuccess(false), 3000)
+    
+    // Asenkron olarak veritabanına kaydet
+    fetch('/api/menus/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subdomain, menus: [blankMenu] })
+    }).then(res => {
+      if (res.ok) {
+        setSavedSuccess(true)
+        setTimeout(() => setSavedSuccess(false), 3000)
+      }
+    }).catch(e => {
+      console.error('Failed to sync blank menu to Supabase:', e)
+    })
   }
 
   // Fotoğraf Yükleme (Otomatik Akıllı Sıkıştırma: WebP/JPEG, Max 800px, %80 Kalite)
@@ -711,7 +741,6 @@ export function LiveMenuEditor() {
 
   const handleSaveAll = async () => {
     if (!menu) return
-    const subdomain = 'lezzet-ocakbasi' // TODO: dynamic
     
     // Draft as backup
     setStoredMenus(subdomain, [menu])
@@ -720,7 +749,7 @@ export function LiveMenuEditor() {
       const res = await fetch('/api/menus/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subdomain, menu })
+        body: JSON.stringify({ subdomain, menus: [menu] })
       })
       if (!res.ok) throw new Error('Failed to save to Supabase')
       
@@ -804,7 +833,12 @@ export function LiveMenuEditor() {
         </div>
       </div>
 
-      {!menu ? (
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border border-gray-200 shadow-sm mt-6">
+          <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4"></div>
+          <p className="text-gray-500 font-medium">Menü verileri yükleniyor...</p>
+        </div>
+      ) : !menu ? (
         /* Uyarı & Menü Yükleme Kartı */
         <motion.div 
           initial={{ opacity: 0, y: 15 }}
@@ -1520,7 +1554,7 @@ export function LiveMenuEditor() {
       <ScanMenuModal
         isOpen={isScanMenuModalOpen}
         onClose={() => setIsScanMenuModalOpen(false)}
-        onMenuCreated={(scannedMenu) => {
+        onMenuCreated={async (scannedMenu) => {
           const newMenu: Menu = {
             id: menu?.id || `menu-${Date.now()}`,
             name: scannedMenu.name || `${currentRestaurant?.name || 'Restoran'} Menüsü`,
@@ -1535,8 +1569,18 @@ export function LiveMenuEditor() {
           }
           setMenu(newMenu)
           setStoredMenus(subdomain, [newMenu])
-          setSavedSuccess(true)
-          setTimeout(() => setSavedSuccess(false), 3000)
+          
+          try {
+            await fetch('/api/menus/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ subdomain, menus: [newMenu] })
+            })
+            setSavedSuccess(true)
+            setTimeout(() => setSavedSuccess(false), 3000)
+          } catch (e) {
+            console.error('Failed to sync scanned menu to Supabase:', e)
+          }
         }}
       />
 

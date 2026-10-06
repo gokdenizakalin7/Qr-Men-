@@ -34,6 +34,9 @@ interface ParsedItem {
   name: string
   price: string
   calories?: number
+  description?: string
+  allergens?: string[]
+  image_url?: string
 }
 
 type Step = 'upload' | 'scanning' | 'results'
@@ -233,8 +236,11 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
         name: c.name || 'Genel',
         items: (c.items || []).map((i: any) => ({
           name: i.name || '',
+          description: i.description || '',
           price: i.price ? String(i.price) : '',
-          calories: typeof i.calories === 'number' ? i.calories : (parseInt(i.calories) || undefined)
+          calories: typeof i.calories === 'number' ? i.calories : (parseInt(i.calories) || undefined),
+          allergens: Array.isArray(i.allergens) ? i.allergens : [],
+          image_url: i.image_url || ''
         }))
       }))
 
@@ -287,6 +293,37 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
       const updated = [...prev]
       const items = [...updated[catIndex].items]
       items[itemIndex] = { ...items[itemIndex], price }
+      updated[catIndex] = { ...updated[catIndex], items }
+      return updated
+    })
+  }
+
+  const updateItemImage = (catIndex: number, itemIndex: number, image_url: string) => {
+    setParsedCategories(prev => {
+      const updated = [...prev]
+      const items = [...updated[catIndex].items]
+      items[itemIndex] = { ...items[itemIndex], image_url }
+      updated[catIndex] = { ...updated[catIndex], items }
+      return updated
+    })
+  }
+
+  const updateItemDescription = (catIndex: number, itemIndex: number, description: string) => {
+    setParsedCategories(prev => {
+      const updated = [...prev]
+      const items = [...updated[catIndex].items]
+      items[itemIndex] = { ...items[itemIndex], description }
+      updated[catIndex] = { ...updated[catIndex], items }
+      return updated
+    })
+  }
+
+  const updateItemAllergens = (catIndex: number, itemIndex: number, allergensStr: string) => {
+    const allergens = allergensStr.split(',').map(a => a.trim()).filter(Boolean)
+    setParsedCategories(prev => {
+      const updated = [...prev]
+      const items = [...updated[catIndex].items]
+      items[itemIndex] = { ...items[itemIndex], allergens }
       updated[catIndex] = { ...updated[catIndex], items }
       return updated
     })
@@ -653,35 +690,65 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
                       {/* Ürünler */}
                       <div className="divide-y">
                         {cat.items.map((item, itemIdx) => (
-                          <div key={itemIdx} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50/50 group">
-                            <span className="text-[10px] text-gray-400 font-mono w-4 shrink-0">{itemIdx + 1}</span>
-                            <Input
-                              value={item.name}
-                              onChange={(e) => updateItemName(catIdx, itemIdx, e.target.value)}
-                              className="h-7 text-sm border-0 bg-transparent shadow-none px-1 flex-1 focus-visible:ring-1"
-                              placeholder="Ürün adı"
-                            />
-                            {item.calories ? (
-                              <span className="text-[10px] text-orange-600 font-bold bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100 whitespace-nowrap flex items-center gap-0.5">
-                                🔥 {item.calories} kcal
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 whitespace-nowrap">
-                                — kcal
-                              </span>
-                            )}
-                            <Input
-                              value={item.price}
-                              onChange={(e) => updateItemPrice(catIdx, itemIdx, e.target.value)}
-                              className="h-7 text-sm font-semibold text-violet-700 border-0 bg-transparent shadow-none px-1 w-24 text-right focus-visible:ring-1"
-                              placeholder="Fiyat (ör: 50 ₺)"
-                            />
-                            <button
-                              onClick={() => deleteItem(catIdx, itemIdx)}
-                              className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
+                          <div key={itemIdx} className="flex flex-col gap-2 px-3 py-3 hover:bg-gray-50/50 group border-b last:border-b-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-gray-400 font-mono w-4 shrink-0">{itemIdx + 1}</span>
+                              <Input
+                                value={item.name}
+                                onChange={(e) => updateItemName(catIdx, itemIdx, e.target.value)}
+                                className="h-7 text-sm font-semibold border-0 bg-transparent shadow-none px-1 flex-1 focus-visible:ring-1"
+                                placeholder="Ürün adı"
+                              />
+                              {item.calories ? (
+                                <span className="text-[10px] text-orange-600 font-bold bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100 whitespace-nowrap flex items-center gap-0.5">
+                                  🔥 {item.calories} kcal
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 whitespace-nowrap">
+                                  — kcal
+                                </span>
+                              )}
+                              <Input
+                                value={item.price}
+                                onChange={(e) => updateItemPrice(catIdx, itemIdx, e.target.value)}
+                                className="h-7 text-sm font-bold text-violet-700 border-0 bg-transparent shadow-none px-1 w-24 text-right focus-visible:ring-1"
+                                placeholder="Fiyat (ör: 50 ₺)"
+                              />
+                              <button
+                                onClick={() => deleteItem(catIdx, itemIdx)}
+                                className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                            
+                            <div className="flex gap-2 pl-6 pt-1">
+                              <Input
+                                value={item.description || ''}
+                                onChange={(e) => updateItemDescription(catIdx, itemIdx, e.target.value)}
+                                className="h-7 text-[11px] text-gray-500 border-0 bg-transparent shadow-none px-1 flex-1 focus-visible:ring-1"
+                                placeholder="Açıklama (opsiyonel)"
+                              />
+                              <div className="flex gap-1">
+                                <div className="relative w-40">
+                                  <Input
+                                    value={item.image_url || ''}
+                                    onChange={(e) => updateItemImage(catIdx, itemIdx, e.target.value)}
+                                    className="h-7 text-[10px] text-gray-500 border-dashed bg-white px-2 focus-visible:ring-1"
+                                    placeholder="Görsel URL (opsiyonel)"
+                                  />
+                                </div>
+                                <div className="relative w-40">
+                                  <Input
+                                    value={(item.allergens || []).join(', ')}
+                                    onChange={(e) => updateItemAllergens(catIdx, itemIdx, e.target.value)}
+                                    className="h-7 text-[10px] text-gray-500 border-dashed bg-white px-2 pr-6 focus-visible:ring-1"
+                                    placeholder="Alerjenler (virgülle)"
+                                  />
+                                  <span className="absolute right-2 top-1.5 text-[10px] text-gray-400 pointer-events-none">⚠️</span>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         ))}
                         {cat.items.length === 0 && (

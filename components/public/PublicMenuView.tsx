@@ -197,7 +197,33 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
   const [feedbackText, setFeedbackText] = useState('')
 
-  const menus = mockMenusByRestaurant[targetSubdomain] || mockMenusByRestaurant['lezzet-ocakbasi'] || []
+  const [menus, setMenus] = useState<Menu[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadMenus() {
+      try {
+        const res = await fetch(`/api/menus/load?subdomain=${targetSubdomain}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data.menus && data.menus.length > 0) {
+            setMenus(data.menus)
+            setIsLoading(false)
+            return
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load real menus", err)
+      }
+      
+      // Fallback to mock data if API fails or returns no menus
+      const fallbackMenus = mockMenusByRestaurant[targetSubdomain] || mockMenusByRestaurant['lezzet-ocakbasi'] || []
+      setMenus(fallbackMenus)
+      setIsLoading(false)
+    }
+    loadMenus()
+  }, [targetSubdomain])
+
   const activeMenu = menus[0]
 
   const primaryColor = restaurant.branding?.primaryColor || '#e11d48'
@@ -272,6 +298,15 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
       setWifiCopied(true)
       setTimeout(() => setWifiCopied(false), 2000)
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-gray-500 font-medium">Menü Yükleniyor...</p>
+      </div>
+    )
   }
 
   return (

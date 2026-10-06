@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Plus, MoreVertical, Eye, Edit3, Trash2, Globe, EyeOff, QrCode, Smartphone, Sparkles, Camera } from 'lucide-react'
+import { Plus, MoreVertical, Eye, Edit3, Trash2, Globe, EyeOff, QrCode, Smartphone, Sparkles, Camera, Utensils } from 'lucide-react'
 import { Menu, Restaurant } from '@/lib/types'
 import { MOCK_RESTAURANTS, getStoredMenus, setStoredMenus } from '@/lib/mock-data'
 import { CreateMenuModal } from '@/components/modals/CreateMenuModal'
@@ -26,23 +26,25 @@ export function MenusContent() {
   const [menus, setMenus] = useState<Menu[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  React.useEffect(() => {
-    async function loadMenus() {
-      try {
-        const res = await fetch(`/api/menus/load?subdomain=${subdomain}`)
-        if (res.ok) {
-          const data = await res.json()
-          setMenus(data.menus || [])
-        } else {
-          setMenus(getStoredMenus(subdomain))
-        }
-      } catch (err) {
-        console.error(err)
+  const loadMenus = async () => {
+    setIsLoading(true)
+    try {
+      const res = await fetch(`/api/menus/load?subdomain=${subdomain}`)
+      if (res.ok) {
+        const data = await res.json()
+        setMenus(data.menus || [])
+      } else {
         setMenus(getStoredMenus(subdomain))
-      } finally {
-        setIsLoading(false)
       }
+    } catch (err) {
+      console.error(err)
+      setMenus(getStoredMenus(subdomain))
+    } finally {
+      setIsLoading(false)
     }
+  }
+
+  React.useEffect(() => {
     loadMenus()
   }, [subdomain])
 
@@ -53,7 +55,7 @@ export function MenusContent() {
 
   const syncWithSupabase = async (updatedMenus: Menu[]) => {
     try {
-      await fetch('/api/menus/sync', {
+      const res = await fetch('/api/menus/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -61,17 +63,28 @@ export function MenusContent() {
           menus: updatedMenus
         })
       })
+      if (res.ok) {
+        await loadMenus()
+      }
     } catch (error) {
       console.error('Failed to sync menus with DB:', error)
     }
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Bu menüyü silmek istediğinize emin misiniz?')) {
-      const updated = menus.filter(menu => menu.id !== id)
-      setMenus(updated)
-      setStoredMenus(subdomain, updated)
-      syncWithSupabase(updated)
+      try {
+        await fetch('/api/menus/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ menuId: id })
+        })
+        const updated = menus.filter(menu => menu.id !== id)
+        setMenus(updated)
+        setStoredMenus(subdomain, updated)
+      } catch (err) {
+        console.error('Failed to delete menu', err)
+      }
     }
   }
 
@@ -142,87 +155,123 @@ export function MenusContent() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {menus.map(menu => {
-          const totalItems = menu.categories?.reduce((total, cat) => total + (cat.items?.length || 0), 0) || 0
-          const activeCats = menu.categories?.filter(c => c.is_active).length || 0
-          
-          return (
-            <Card key={menu.id} className={`overflow-hidden shadow-sm hover:shadow-md transition-shadow ${!menu.is_listed ? 'opacity-80 bg-gray-50' : 'bg-white'}`}>
-              <div className="relative h-48 w-full">
-                <img
-                  src={menu.image_url}
-                  alt={menu.name}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute top-2 right-2 flex gap-1">
-                  {!menu.is_listed ? (
-                    <span className="bg-amber-600 text-white px-2 py-0.5 rounded text-xs font-semibold flex items-center">
-                      <EyeOff className="h-3 w-3 mr-1" /> Yayında Değil
-                    </span>
-                  ) : (
-                    <span className="bg-green-600 text-white px-2 py-0.5 rounded text-xs font-semibold flex items-center">
-                      <Globe className="h-3 w-3 mr-1" /> Yayında
-                    </span>
-                  )}
-                </div>
-              </div>
-              
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg font-bold">{menu.name}</CardTitle>
-                    <CardDescription className="line-clamp-1">{menu.description || 'Açıklama bulunmuyor'}</CardDescription>
+      {menus.length === 0 && !isLoading ? (
+        <div className="text-center py-16 bg-white rounded-xl border border-dashed border-gray-300 shadow-sm">
+          <Utensils className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Henüz Bir Menünüz Yok</h3>
+          <p className="text-gray-500 max-w-md mx-auto mb-6">
+            Müşterilerinize sunmak için ilk dijital menünüzü oluşturun veya fiziksel menünüzü tarayarak yapay zeka ile hemen oluşturun.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <Button 
+              size="lg" 
+              onClick={() => navigate('/dashboard/menu-editor')}
+              className="bg-primary hover:bg-primary/90 text-white font-bold px-6 py-6 text-base shadow-md w-full sm:w-auto"
+            >
+              <Sparkles className="h-5 w-5 mr-2" /> Hazır Menü Paketi Yükle
+            </Button>
+
+            <Button 
+              size="lg" 
+              onClick={() => setIsScanMenuModalOpen(true)}
+              className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold px-6 py-6 text-base shadow-md w-full sm:w-auto"
+            >
+              <Camera className="h-5 w-5 mr-2" /> Kendi Menünü Tara
+            </Button>
+
+            <Button 
+              size="lg" 
+              variant="outline"
+              onClick={() => setIsCreateMenuModalOpen(true)}
+              className="border-gray-300 hover:bg-gray-50 text-gray-800 font-semibold px-6 py-6 text-base w-full sm:w-auto"
+            >
+              <Plus className="h-5 w-5 mr-2 text-primary" /> Sıfırdan Boş Menü Başlat
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {menus.map(menu => {
+            const totalItems = menu.categories?.reduce((total, cat) => total + (cat.items?.length || 0), 0) || 0
+            const activeCats = menu.categories?.filter(c => c.is_active).length || 0
+            
+            return (
+              <Card key={menu.id} className={`overflow-hidden shadow-sm hover:shadow-md transition-shadow ${!menu.is_listed ? 'opacity-80 bg-gray-50' : 'bg-white'}`}>
+                <div className="relative h-48 w-full">
+                  <img
+                    src={menu.image_url}
+                    alt={menu.name}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-2 right-2 flex gap-1">
+                    {!menu.is_listed ? (
+                      <span className="bg-amber-600 text-white px-2 py-0.5 rounded text-xs font-semibold flex items-center">
+                        <EyeOff className="h-3 w-3 mr-1" /> Yayında Değil
+                      </span>
+                    ) : (
+                      <span className="bg-green-600 text-white px-2 py-0.5 rounded text-xs font-semibold flex items-center">
+                        <Globe className="h-3 w-3 mr-1" /> Yayında
+                      </span>
+                    )}
                   </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => navigate('/dashboard/menu-editor')}>
-                        <Smartphone className="h-4 w-4 mr-2 text-primary" /> Canlı Editörde Aç
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate(`/menu/${subdomain}`)}>
-                        <Eye className="h-4 w-4 mr-2" /> Menüyü Görüntüle
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setSelectedQRMenu(menu)}>
-                        <QrCode className="h-4 w-4 mr-2" /> QR Kodunu Göster
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => toggleMenuListing(menu.id)}>
-                        {menu.is_listed ? <EyeOff className="h-4 w-4 mr-2" /> : <Globe className="h-4 w-4 mr-2" />}
-                        {menu.is_listed ? 'Yayından Kaldır' : 'Yayına Al'}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        className="text-red-600 font-medium"
-                        onClick={() => handleDelete(menu.id)}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" /> Menüyü Sil
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </div>
-              </CardHeader>
-              
-              <CardContent className="pt-0">
-                <div className="flex justify-between items-center text-xs text-muted-foreground pt-2 border-t mt-2">
-                  <span>{activeCats}/{menu.categories?.length || 0} Kategori Aktif • {totalItems} Ürün</span>
-                  <Button 
-                    variant="link" 
-                    size="sm" 
-                    className="h-auto p-0 text-primary font-bold"
-                    onClick={() => navigate('/dashboard/menu-editor')}
-                  >
-                    Canlı Düzenle →
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+                
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-lg font-bold">{menu.name}</CardTitle>
+                      <CardDescription className="line-clamp-1">{menu.description || 'Açıklama bulunmuyor'}</CardDescription>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => navigate(`/dashboard/menu-editor?menu=${menu.id}`)}>
+                          <Smartphone className="h-4 w-4 mr-2 text-primary" /> Canlı Editörde Aç
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => navigate(`/menu/${subdomain}`)}>
+                          <Eye className="h-4 w-4 mr-2" /> Menüyü Görüntüle
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setSelectedQRMenu(menu)}>
+                          <QrCode className="h-4 w-4 mr-2" /> QR Kodunu Göster
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => toggleMenuListing(menu.id)}>
+                          {menu.is_listed ? <EyeOff className="h-4 w-4 mr-2" /> : <Globe className="h-4 w-4 mr-2" />}
+                          {menu.is_listed ? 'Yayından Kaldır' : 'Yayına Al'}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          className="text-red-600 font-medium"
+                          onClick={() => handleDelete(menu.id)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" /> Menüyü Sil
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                
+                <CardContent className="pt-0">
+                  <div className="flex justify-between items-center text-xs text-muted-foreground pt-2 border-t mt-2">
+                    <span>{activeCats}/{menu.categories?.length || 0} Kategori Aktif • {totalItems} Ürün</span>
+                    <Button 
+                      variant="link" 
+                      size="sm" 
+                      className="h-auto p-0 text-primary font-bold"
+                      onClick={() => navigate(`/dashboard/menu-editor?menu=${menu.id}`)}
+                    >
+                      Canlı Düzenle →
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
 
       <CreateMenuModal 
         isOpen={isCreateMenuModalOpen} 

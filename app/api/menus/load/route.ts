@@ -29,40 +29,50 @@ export async function GET(request: Request) {
       .from('menus')
       .select('id, name, description, image_url, is_listed, layout, created_at, updated_at')
       .eq('organization_id', orgData.id)
-      .limit(1)
+      .order('created_at', { ascending: true })
 
     if (menusError || !menusData || menusData.length === 0) {
       return NextResponse.json({ menus: [] })
     }
 
-    const menu: any = menusData[0]
+    const menuIds = menusData.map(m => m.id)
 
-    // Fetch categories
+    // Fetch all categories for these menus
     const { data: categoriesData } = await supabase
       .from('categories')
       .select('*')
-      .eq('menu_id', menu.id)
+      .in('menu_id', menuIds)
       .order('display_order', { ascending: true })
 
+    let allItems: any[] = []
     if (categoriesData && categoriesData.length > 0) {
-      // Fetch items for these categories
       const categoryIds = categoriesData.map(c => c.id)
       const { data: itemsData } = await supabase
         .from('items')
         .select('*')
         .in('category_id', categoryIds)
         .order('display_order', { ascending: true })
-
-      // Reconstruct nested JSON
-      menu.categories = categoriesData.map(cat => ({
-        ...cat,
-        items: (itemsData || []).filter(i => i.category_id === cat.id)
-      }))
-    } else {
-      menu.categories = []
+      
+      if (itemsData) {
+        allItems = itemsData
+      }
     }
 
-    return NextResponse.json({ menus: [menu] })
+    const menusWithDetails = menusData.map(menu => {
+      const menuCategories = (categoriesData || []).filter(c => c.menu_id === menu.id)
+      
+      const categoriesWithItems = menuCategories.map(cat => ({
+        ...cat,
+        items: allItems.filter(i => i.category_id === cat.id)
+      }))
+
+      return {
+        ...menu,
+        categories: categoriesWithItems
+      }
+    })
+
+    return NextResponse.json({ menus: menusWithDetails })
   } catch (err: any) {
     console.error("Load error:", err)
     return NextResponse.json({ error: err.message }, { status: 500 })

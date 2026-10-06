@@ -86,11 +86,12 @@ export function SettingsContent() {
     }
 
     try {
-      if (updatedRest.id && updatedRest.id !== 'org-1' && !updatedRest.id.startsWith('mock')) {
+      if (updatedRest.subdomain && updatedRest.subdomain !== 'lezzet-ocakbasi') {
         const res = await fetch('/api/organizations/update', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            subdomain: updatedRest.subdomain,
             id: updatedRest.id,
             name: updatedRest.name,
             currency: updatedRest.currency,
@@ -98,13 +99,17 @@ export function SettingsContent() {
             branding: updatedRest.branding
           })
         })
-        if (!res.ok) throw new Error('API Error')
+        if (!res.ok) {
+          const errData = await res.json()
+          throw new Error(errData.error || 'API Error')
+        }
       }
       setCurrentRestaurant(updatedRest)
       localStorage.setItem('currentRestaurant', JSON.stringify(updatedRest))
   
       setSaveMessage('Ayarlar başarıyla kaydedildi!')
     } catch (err) {
+      console.error(err)
       setSaveMessage('Kaydedilirken hata oluştu.')
     } finally {
       setIsSaving(false)

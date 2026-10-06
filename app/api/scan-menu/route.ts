@@ -108,6 +108,8 @@ Menüdeki tüm kategori başlıklarını ve her kategorinin altındaki ürünler
 6. Türkçe karakterleri (ç, ğ, ı, ö, ş, ü, Ç, Ğ, İ, Ö, Ş, Ü) ve parantezli detayları (ör: "(French press)", "(Sütlü)") eksiksiz ve temiz yaz.
 7. Menüdeki hiçbir geçerli kategoriyi ve ürünü atlama.
 8. Kaloriler: Her ürün için uzman bir diyetisyen gibi düşünerek, Türk mutfağı ve restoran standartlarına göre 1 kişilik porsiyon bazında ortalama kalori değerini (kcal) tahmin et. Ürün genellikle garnitürle (ör: burgerin yanındaki patates) sunuluyorsa kaloriyi buna göre hesapla. İçeceklerde standart fincan/bardak porsiyonunu baz al.
+11. Alerjenler: Her ürün için içerik tahmini yaparak Türkçe isimleriyle olası alerjenleri bir dizi (array) olarak döndür. (Örn: ["Gluten", "Süt", "Yumurta", "Fıstık", "Deniz Ürünü", "Soya"]). Eğer tahmin edilemiyorsa veya alerjen yoksa boş dizi [] döndür.
+12. Açıklama: Her ürün için müşterinin iştahını açacak, kısa, şık ve açıklayıcı bir ürün açıklaması yaz (maksimum 1-2 cümle). (Örnek: "Taze demlenmiş, yumuşak içimli aromatik filtre kahve.")
 
 Lütfen çıktıyı tam olarak şu JSON şemasında ver:
 {
@@ -118,8 +120,10 @@ Lütfen çıktıyı tam olarak şu JSON şemasında ver:
       "items": [
         {
           "name": "string",
+          "description": "string",
           "price": "string",
-          "calories": "number (tahmini 1 porsiyon kcal, eğer tahmin edemiyorsan null yaz)"
+          "calories": "number (tahmini 1 porsiyon kcal, eğer tahmin edemiyorsan null yaz)",
+          "allergens": ["string", "string"]
         }
       ]
     }
@@ -209,8 +213,10 @@ Lütfen çıktıyı tam olarak şu JSON şemasında ver:
       name: sanitizeText(cat.name || 'Genel', 80),
       items: (cat.items || []).map((item: any) => ({
         name: sanitizeText(item.name || '', 120),
+        description: sanitizeText(item.description || '', 255),
         price: sanitizePrice(item.price || ''),
-        calories: typeof item.calories === 'number' ? item.calories : null
+        calories: typeof item.calories === 'number' ? item.calories : null,
+        allergens: Array.isArray(item.allergens) ? item.allergens.map((a: any) => sanitizeText(String(a), 50)) : []
       }))
     }))
 
