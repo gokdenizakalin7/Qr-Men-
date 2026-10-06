@@ -3,6 +3,7 @@ import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limiter'
 import { validateBase64Image } from '@/lib/file-validator'
 import { sanitizeText, sanitizePrice } from '@/lib/sanitizer'
 import { logSecurityEvent } from '@/lib/security-logger'
+import { requireUser } from '@/lib/auth-middleware'
 
 export const maxDuration = 60
 
@@ -13,6 +14,10 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req)
+
+  // 0. OTURUM ZORUNLU (Gemini maliyetini yetkisiz kullanıma karşı koru)
+  const auth = await requireUser(req)
+  if ('response' in auth) return auth.response
 
   // 1. RATE LIMIT KORUMASI (10 dakikada en fazla 5 tarama)
   const rateLimitKey = `scan_menu_${ip}`

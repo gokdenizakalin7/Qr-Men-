@@ -133,9 +133,9 @@ export function middleware(request: NextRequest) {
     default-src 'self';
     script-src 'self' 'unsafe-inline' 'unsafe-eval' https:;
     style-src 'self' 'unsafe-inline' https:;
-    img-src 'self' data: blob: https://images.unsplash.com https://*.googleusercontent.com https://*.unsplash.com;
+    img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.googleusercontent.com https://*.unsplash.com;
     font-src 'self' data: https:;
-    connect-src 'self' https://generativelanguage.googleapis.com https://*.googleapis.com;
+    connect-src 'self' https://*.supabase.co wss://*.supabase.co https://generativelanguage.googleapis.com https://*.googleapis.com;
     frame-ancestors 'self';
     base-uri 'self';
     form-action 'self';

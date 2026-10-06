@@ -1,73 +1,71 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
+import { requireSubdomainAccess } from '@/lib/auth-middleware'
 
 export async function POST(request: Request) {
   try {
     const { subdomain, tables } = await request.json()
 
-    if (!subdomain) {
+    if (!subdomain || typeof subdomain !== 'string') {
       return NextResponse.json({ error: 'Subdomain is required' }, { status: 400 })
     }
-
-    const { data: orgData, error: orgError } = await supabase
-      .from('organizations')
-      .select('id')
-      .eq('subdomain', subdomain)
-      .single()
-
-    if (orgError || !orgData) {
-      return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
+    if (!Array.isArray(tables)) {
+      return NextResponse.json({ error: 'tables bir dizi olmalı' }, { status: 400 })
     }
 
-    const orgId = orgData.id
+    const access = await requireSubdomainAccess(request, subdomain)
+    if ('response' in access) return access.response
+    const orgId = access.organizationId
 
-    // 1. Get existing tables
+    // Mevcut masalar
     const { data: existingTables } = await supabase
       .from('qr_tables')
       .select('id')
       .eq('organization_id', orgId)
 
-    const existingIds = (existingTables || []).map(t => t.id)
-    const incomingIds = (tables || []).map((t: any) => t.id)
+    const existingIds = new Set((existingTables || []).map(t => t.id))
+    const incomingIds = new Set(tables.map((t: any) => t.id))
 
-    // 2. Find tables to delete
-    const idsToDelete = existingIds.filter(id => !incomingIds.includes(id))
+    // Silinecek masalar (yalnızca bu organizasyonun masaları)
+    const idsToDelete = [...existingIds].filter(id => !incomingIds.has(id))
     if (idsToDelete.length > 0) {
-      await supabase.from('qr_tables').delete().in('id', idsToDelete)
+      const { error } = await supabase
+        .from('qr_tables')
+        .delete()
+        .eq('organization_id', orgId)
+        .in('id', idsToDelete)
+      if (error) throw error
     }
 
-    // 3. Insert or update tables
-    const upsertData = (tables || []).map((t: any) => ({
-      id: t.id.startsWith('tbl-') ? undefined : t.id, // Let DB generate UUID if it's a new mock id
-      organization_id: orgId,
-      name: t.name,
-      views: t.views || 0,
-      updated_at: new Date().toISOString()
-    }))
+    const newTables = tables
+      .filter((t: any) => typeof t.id !== 'string' || t.id.startsWith('tbl-'))
+      .map((t: any) => ({
+        organization_id: orgId,
+        name: t.name,
+        views: t.views || 0,
+      }))
 
-    if (upsertData.length > 0) {
-      // Split new vs existing
-      const newTables = upsertData.filter((t: any) => !t.id)
-      const existingToUpdate = upsertData.filter((t: any) => t.id)
+    if (newTables.length > 0) {
+      const { error } = await supabase.from('qr_tables').insert(newTables)
+      if (error) throw error
+    }
 
-      if (newTables.length > 0) {
-        await supabase.from('qr_tables').insert(newTables)
-      }
-      
-      for (const table of existingToUpdate) {
-        await supabase.from('qr_tables').update({
-          name: table.name,
-          views: table.views
-        }).eq('id', table.id)
-      }
+    // Güncelleme: yalnızca bu organizasyonda var olan kimlikler
+    const toUpdate = tables.filter(
+      (t: any) => typeof t.id === 'string' && !t.id.startsWith('tbl-') && existingIds.has(t.id)
+    )
+    for (const table of toUpdate) {
+      const { error } = await supabase
+        .from('qr_tables')
+        .update({ name: table.name, views: table.views || 0 })
+        .eq('id', table.id)
+        .eq('organization_id', orgId)
+      if (error) throw error
     }
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('Tables sync error:', error)
+    return NextResponse.json({ error: 'Masalar kaydedilemedi.' }, { status: 500 })
   }
 }

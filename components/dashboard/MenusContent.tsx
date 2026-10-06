@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { authFetch } from '@/lib/api-client'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -55,7 +56,7 @@ export function MenusContent() {
 
   const syncWithSupabase = async (updatedMenus: Menu[]) => {
     try {
-      const res = await fetch('/api/menus/sync', {
+      const res = await authFetch('/api/menus/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -74,7 +75,7 @@ export function MenusContent() {
   const handleDelete = async (id: string) => {
     if (confirm('Bu menüyü silmek istediğinize emin misiniz?')) {
       try {
-        await fetch('/api/menus/delete', {
+        await authFetch('/api/menus/delete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ menuId: id })

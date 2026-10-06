@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { authFetch } from '@/lib/api-client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -87,7 +88,7 @@ export function SettingsContent() {
 
     try {
       if (updatedRest.subdomain && updatedRest.subdomain !== 'lezzet-ocakbasi') {
-        const res = await fetch('/api/organizations/update', {
+        const res = await authFetch('/api/organizations/update', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
+import { authFetch } from '@/lib/api-client'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -247,8 +248,9 @@ export function LiveMenuEditor() {
             }
             setStoredMenus(subdomain, data.menus)
           } else {
-            // Veritabanında menü yoksa boş state'i göster (menu: null kalır)
-            setMenu(null)
+            // Veritabanında menü yoksa boş state'i göster; ancak kullanıcının bu sırada
+            // oluşturduğu (henüz geçici kimlikli) menüyü geç gelen boş yanıtla ezme.
+            setMenu(prev => (prev && prev.id.startsWith('menu-') ? prev : null))
           }
         }
       } catch (err) {
@@ -322,6 +324,18 @@ export function LiveMenuEditor() {
     return () => clearTimeout(timeoutId)
   }, [menu, subdomain])
 
+  // Sunucunun verdiği gerçek menü kimliğini uygula (geçici "menu-..." kimliği kopya menü üretmesin)
+  const adoptServerIds = async (res: Response) => {
+    try {
+      const data = await res.clone().json()
+      const idMap: Record<string, string> = data?.idMap || {}
+      if (Object.keys(idMap).length === 0) return
+      setMenu(prev => (prev && idMap[prev.id] ? { ...prev, id: idMap[prev.id] } : prev))
+    } catch {
+      // yanıt JSON değilse yok say
+    }
+  }
+
   // HAZIR MENÜ ŞABLONUNU YÜKLE
   const handleApplyTemplate = (tmpl: MenuTemplate) => {
     if (menu && menu.categories && menu.categories.length > 0) {
@@ -351,12 +365,13 @@ export function LiveMenuEditor() {
     setIsTemplateModalOpen(false)
     
     // Asenkron olarak veritabanına kaydet
-    fetch('/api/menus/sync', {
+    authFetch('/api/menus/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ subdomain, menus: [newMenu] })
-    }).then(res => {
+    }).then(async res => {
       if (res.ok) {
+        await adoptServerIds(res)
         setSavedSuccess(true)
         setTimeout(() => setSavedSuccess(false), 3000)
       }
@@ -392,12 +407,13 @@ export function LiveMenuEditor() {
     setStoredMenus(subdomain, [blankMenu])
     
     // Asenkron olarak veritabanına kaydet
-    fetch('/api/menus/sync', {
+    authFetch('/api/menus/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ subdomain, menus: [blankMenu] })
-    }).then(res => {
+    }).then(async res => {
       if (res.ok) {
+        await adoptServerIds(res)
         setSavedSuccess(true)
         setTimeout(() => setSavedSuccess(false), 3000)
       }
@@ -437,7 +453,7 @@ export function LiveMenuEditor() {
     setIsEstimatingCalories(true)
     setCalorieError('')
     try {
-      const res = await fetch('/api/estimate-calories', {
+      const res = await authFetch('/api/estimate-calories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -465,7 +481,7 @@ export function LiveMenuEditor() {
     setIsDetailedEstimating(true)
     setCalorieError('')
     try {
-      const res = await fetch('/api/estimate-calories', {
+      const res = await authFetch('/api/estimate-calories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -746,12 +762,13 @@ export function LiveMenuEditor() {
     setStoredMenus(subdomain, [menu])
     
     try {
-      const res = await fetch('/api/menus/sync', {
+      const res = await authFetch('/api/menus/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subdomain, menus: [menu] })
       })
       if (!res.ok) throw new Error('Failed to save to Supabase')
+      await adoptServerIds(res)
       
       console.log('Menü Supabase veritabanına kaydedildi:', menu)
       setSavedSuccess(true)
@@ -1571,11 +1588,13 @@ export function LiveMenuEditor() {
           setStoredMenus(subdomain, [newMenu])
           
           try {
-            await fetch('/api/menus/sync', {
+            const syncRes = await authFetch('/api/menus/sync', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ subdomain, menus: [newMenu] })
             })
+            if (!syncRes.ok) throw new Error('Failed to save scanned menu')
+            await adoptServerIds(syncRes)
             setSavedSuccess(true)
             setTimeout(() => setSavedSuccess(false), 3000)
           } catch (e) {

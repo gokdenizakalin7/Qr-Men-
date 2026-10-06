@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useCallback, useEffect } from 'react'
+import { authFetch } from '@/lib/api-client'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -207,7 +208,7 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
       setScanStatus('Yapay Zeka (Gemini Vision) menüyü analiz ediyor...')
 
       // Sunucu rotasına gönder (API anahtarı yalnızca sunucu .env.local üzerinden okunur)
-      const res = await fetch('/api/scan-menu', {
+      const res = await authFetch('/api/scan-menu', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ images })

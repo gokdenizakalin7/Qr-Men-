@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { authFetch } from '@/lib/api-client'
 import { QRCodeSVG } from 'qrcode.react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -68,7 +69,7 @@ export function QRCodesContent() {
 
   const syncWithSupabase = async (updatedTables: TableItem[]) => {
     try {
-      await fetch('/api/tables/sync', {
+      await authFetch('/api/tables/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subdomain, tables: updatedTables })
