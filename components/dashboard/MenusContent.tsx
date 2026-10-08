@@ -9,12 +9,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Plus, MoreVertical, Eye, Edit3, Trash2, Globe, EyeOff, QrCode, Smartphone, Sparkles, Camera, Utensils } from 'lucide-react'
 import { Menu, Restaurant } from '@/lib/types'
 import { getStoredMenus, setStoredMenus } from '@/lib/mock-data'
-import { CreateMenuModal } from '@/components/modals/CreateMenuModal'
 import { QRCodeModal } from '@/components/modals/QRCodeModal'
 import { ScanMenuModal } from '@/components/modals/ScanMenuModal'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { authFetch } from '@/lib/api-client'
 
 export function MenusContent() {
   const [currentRestaurant] = useState<Restaurant | null>(() => {
@@ -51,7 +49,6 @@ export function MenusContent() {
     loadMenus()
   }, [subdomain])
 
-  const [isCreateMenuModalOpen, setIsCreateMenuModalOpen] = useState(false)
   const [isScanMenuModalOpen, setIsScanMenuModalOpen] = useState(false)
   const [selectedQRMenu, setSelectedQRMenu] = useState<any>(null)
   const navigate = useNavigate()
@@ -115,35 +112,6 @@ export function MenusContent() {
     }
   }
 
-  const handleCreateMenu = (newMenu: Partial<Menu>) => {
-    const created: Menu = {
-      id: `menu-${Date.now()}`,
-      name: newMenu.name || 'Yeni Menü',
-      description: newMenu.description || '',
-      image_url: newMenu.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=400&fit=crop',
-      is_listed: true,
-      layout: 'grid',
-      available_days: [1, 2, 3, 4, 5, 6, 7],
-      categories: [
-        {
-          id: `cat-${Date.now()}`,
-          name: 'Başlangıçlar',
-          is_active: true,
-          display_order: 1,
-          items: []
-        }
-      ],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-    const previousMenus = [...menus]
-    const updated = [...menus, created]
-    setMenus(updated)
-    setStoredMenus(subdomain, updated)
-    syncWithSupabase(updated, previousMenus)
-    setIsCreateMenuModalOpen(false)
-  }
-
   const toggleMenuListing = (id: string) => {
     const previousMenus = [...menus]
     const updated = menus.map(menu => 
@@ -164,31 +132,31 @@ export function MenusContent() {
     >
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Menü Yönetimi</h1>
-          <p className="text-sm text-gray-500">Restoranınızın dijital menülerini oluşturun ve canlı editörde düzenleyin</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Menü Yönetimi</h1>
+          <p className="text-sm text-muted-foreground">Restoranınızın dijital menülerini oluşturun ve canlı editörde düzenleyin</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => navigate('/dashboard/menu-editor')}>
             <Smartphone className="mr-2 h-4 w-4 text-primary" /> Canlı Editöre Git
           </Button>
           <Button 
             variant="outline" 
             onClick={() => setIsScanMenuModalOpen(true)}
-            className="border-violet-300 text-violet-700 hover:bg-violet-50"
+            className="scan-attention border-violet-300 text-violet-700 hover:bg-violet-50"
           >
             <Camera className="mr-2 h-4 w-4" /> Kendi Menünü Tara
           </Button>
-          <Button onClick={() => setIsCreateMenuModalOpen(true)}>
+          <Button onClick={() => navigate('/dashboard/menu-editor')}>
             <Plus className="mr-2 h-4 w-4" /> Yeni Menü Oluştur
           </Button>
         </div>
       </div>
 
       {menus.length === 0 && !isLoading ? (
-        <div className="text-center py-16 bg-white rounded-xl border border-dashed border-gray-300 shadow-sm">
-          <Utensils className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Henüz Bir Menünüz Yok</h3>
-          <p className="text-gray-500 max-w-md mx-auto mb-6">
+        <div className="text-center py-16 glass-card border-dashed">
+          <Utensils className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">Henüz Bir Menünüz Yok</h3>
+          <p className="text-muted-foreground max-w-md mx-auto mb-6">
             Müşterilerinize sunmak için ilk dijital menünüzü oluşturun veya fiziksel menünüzü tarayarak yapay zeka ile hemen oluşturun.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
@@ -203,7 +171,7 @@ export function MenusContent() {
             <Button 
               size="lg" 
               onClick={() => setIsScanMenuModalOpen(true)}
-              className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold px-6 py-6 text-base shadow-md w-full sm:w-auto"
+              className="scan-attention bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold px-6 py-6 text-base shadow-md w-full sm:w-auto"
             >
               <Camera className="h-5 w-5 mr-2" /> Kendi Menünü Tara
             </Button>
@@ -211,8 +179,8 @@ export function MenusContent() {
             <Button 
               size="lg" 
               variant="outline"
-              onClick={() => setIsCreateMenuModalOpen(true)}
-              className="border-gray-300 hover:bg-gray-50 text-gray-800 font-semibold px-6 py-6 text-base w-full sm:w-auto"
+              onClick={() => navigate('/dashboard/menu-editor')}
+              className="border-border hover:bg-accent text-foreground font-semibold px-6 py-6 text-base w-full sm:w-auto"
             >
               <Plus className="h-5 w-5 mr-2 text-primary" /> Sıfırdan Boş Menü Başlat
             </Button>
@@ -225,7 +193,7 @@ export function MenusContent() {
             const activeCats = menu.categories?.filter(c => c.is_active).length || 0
             
             return (
-              <Card key={menu.id} className={`overflow-hidden shadow-sm hover:shadow-md transition-shadow ${!menu.is_listed ? 'opacity-80 bg-gray-50' : 'bg-white'}`}>
+              <Card key={menu.id} className={`overflow-hidden hover:-translate-y-1 hover:shadow-2xl transition-all duration-300 ${!menu.is_listed ? 'opacity-70' : ''}`}>
                 <div className="relative h-48 w-full">
                   <img
                     src={menu.image_url}
@@ -301,12 +269,6 @@ export function MenusContent() {
           })}
         </div>
       )}
-
-      <CreateMenuModal 
-        isOpen={isCreateMenuModalOpen} 
-        onClose={() => setIsCreateMenuModalOpen(false)}
-        onSubmit={handleCreateMenu}
-      />
 
       <ScanMenuModal
         isOpen={isScanMenuModalOpen}

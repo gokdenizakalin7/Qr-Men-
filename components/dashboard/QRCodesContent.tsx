@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { authFetch } from '@/lib/api-client'
 import { Restaurant } from '@/lib/types'
 import { 
   QrCode, 
@@ -144,12 +143,12 @@ export function QRCodesContent() {
   return (
     <div className="space-y-6">
       {/* Üst Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border shadow-sm">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground flex items-center">
             <QrCode className="mr-2 h-6 w-6 text-primary" /> QR Kodlar & Masa Standı Baskı Şablonları
           </h1>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             Masalarınıza özel QR kodlar oluşturabilir ve matbaaya/yazıcıya hazır profesyonel akrilik standlar yazdırabilirsiniz.
           </p>
         </div>
@@ -170,10 +169,10 @@ export function QRCodesContent() {
       </div>
 
       {/* Ana Genel Mekan QR Kartı */}
-      <Card className="bg-white border-2 border-primary/20 shadow-sm overflow-hidden">
-        <div className="p-5 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 bg-white border-2 border-gray-200 rounded-2xl shadow-xs shrink-0 flex items-center justify-center w-32 h-32">
+      <Card className="border-2 border-primary/20 shadow-sm overflow-hidden">
+        <div className="p-5 flex flex-col lg:flex-row items-center justify-between gap-6">
+          <div className="flex flex-col sm:flex-row items-center gap-4 min-w-0">
+            <div className="keep-light bg-white p-3 border-2 border-gray-200 rounded-2xl shadow-xs shrink-0 flex items-center justify-center w-32 h-32">
               <QRCodeSVG 
                 value={getTableLink('Genel Menü')}
                 size={112}
@@ -181,16 +180,16 @@ export function QRCodesContent() {
                 includeMargin={false}
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0 text-center sm:text-left">
               <span className="text-[11px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">
                 Genel Mekan QR Kodu
               </span>
-              <h2 className="text-lg font-extrabold text-gray-900">{currentRestaurant.name}</h2>
-              <p className="text-xs text-gray-500 max-w-md">
+              <h2 className="text-lg font-extrabold text-foreground">{currentRestaurant.name}</h2>
+              <p className="text-xs text-muted-foreground max-w-md">
                 Sosyal medya bio'nuzda, broşürlerinizde veya restoran giriş kapısında kullanabileceğiniz genel dijital menü bağlantınızdır.
               </p>
-              <div className="flex items-center gap-2 pt-1">
-                <code className="text-[11px] bg-gray-100 px-2.5 py-1 rounded border text-gray-700 font-mono">
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <code className="text-[11px] bg-gray-100 px-2.5 py-1 rounded border text-gray-700 font-mono break-all">
                   {getTableLink('Genel Menü')}
                 </code>
                 <Button 
@@ -206,7 +205,7 @@ export function QRCodesContent() {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 w-full lg:w-auto sm:justify-center">
             <Button 
               size="sm" 
               variant="outline" 
@@ -229,22 +228,22 @@ export function QRCodesContent() {
       </Card>
 
       {/* Masalar Tablosu */}
-      <Card className="bg-white shadow-sm">
-        <CardHeader className="py-3 px-4 bg-gray-50 border-b flex flex-row items-center justify-between">
+      <Card className="shadow-sm">
+        <CardHeader className="py-3 px-4 bg-muted/40 border-b flex flex-row items-center justify-between">
           <div>
-            <CardTitle className="text-sm font-bold text-gray-900">Masaya Özel QR Kodlar & Görüntüleme</CardTitle>
-            <CardDescription className="text-xs text-gray-500">
+            <CardTitle className="text-sm font-bold text-foreground">Masaya Özel QR Kodlar & Görüntüleme</CardTitle>
+            <CardDescription className="text-xs text-muted-foreground">
               Masalarınız için ayrı QR kodlar; masa numarası ve Wi-Fi bilgisiyle profesyonel masa standı olarak yazdırabilirsiniz.
             </CardDescription>
           </div>
-          <span className="text-xs font-bold text-gray-500 bg-gray-200 px-2.5 py-1 rounded-full">
+          <span className="text-xs font-bold text-muted-foreground bg-gray-200 px-2.5 py-1 rounded-full">
             {tables.length} Masa Kayıtlı
           </span>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className="bg-gray-50/50">
+              <TableRow className="bg-muted/40/50">
                 <TableHead className="w-16 text-xs font-bold">Masa</TableHead>
                 <TableHead className="text-xs font-bold">Masa Adı / Konum</TableHead>
                 <TableHead className="text-xs font-bold">QR Önizleme</TableHead>
@@ -256,16 +255,16 @@ export function QRCodesContent() {
               {tables.map((table, index) => {
                 const tableUrl = getTableLink(table.name)
                 return (
-                  <TableRow key={table.id} className="hover:bg-gray-50/80">
-                    <TableCell className="font-mono text-xs font-bold text-gray-500">
+                  <TableRow key={table.id} className="hover:bg-accent/80">
+                    <TableCell className="font-mono text-xs font-bold text-muted-foreground">
                       #{index + 1}
                     </TableCell>
                     <TableCell>
-                      <span className="font-bold text-sm text-gray-900">{table.name}</span>
+                      <span className="font-bold text-sm text-foreground">{table.name}</span>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
-                        <div className="w-9 h-9 rounded border bg-white p-0.5 flex items-center justify-center shrink-0">
+                        <div className="keep-light bg-white w-9 h-9 rounded border p-0.5 flex items-center justify-center shrink-0">
                           <QRCodeSVG 
                             value={tableUrl}
                             size={32}
@@ -275,7 +274,7 @@ export function QRCodesContent() {
                         </div>
                         <button
                           onClick={() => handleCopyLink(tableUrl, table.id)}
-                          className="text-[11px] text-gray-500 hover:text-primary flex items-center font-mono"
+                          className="text-[11px] text-muted-foreground hover:text-primary flex items-center font-mono"
                         >
                           {copiedId === table.id ? <Check className="h-3 w-3 mr-1 text-green-600" /> : <Copy className="h-3 w-3 mr-1" />}
                           {copiedId === table.id ? 'Kopyalandı' : 'Linki Al'}
@@ -300,7 +299,7 @@ export function QRCodesContent() {
                         <Button 
                           size="sm" 
                           variant="ghost" 
-                          className="h-7 text-xs text-gray-600"
+                          className="h-7 text-xs text-muted-foreground"
                           onClick={() => handleOpenPrintModal(table, 'sticker')}
                         >
                           Sticker
@@ -308,7 +307,7 @@ export function QRCodesContent() {
                         <Button 
                           size="icon" 
                           variant="ghost" 
-                          className="h-7 w-7 text-gray-400 hover:text-red-600"
+                          className="h-7 w-7 text-muted-foreground hover:text-red-600"
                           onClick={() => handleDeleteTable(table.id)}
                           title="Masayı Sil"
                         >
@@ -386,7 +385,7 @@ export function QRCodesContent() {
               className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
                 selectedTemplate === 'acrylic' 
                   ? 'bg-primary text-white border-primary shadow-xs' 
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
+                  : 'text-gray-700 hover:bg-accent border-border'
               }`}
             >
               Dikey Akrilik Masa Standı (10x15cm)
@@ -396,7 +395,7 @@ export function QRCodesContent() {
               className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
                 selectedTemplate === 'sticker' 
                   ? 'bg-primary text-white border-primary shadow-xs' 
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
+                  : 'text-gray-700 hover:bg-accent border-border'
               }`}
             >
               Masa Çıkartması (Sticker)
@@ -406,7 +405,7 @@ export function QRCodesContent() {
               className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
                 selectedTemplate === 'bulk_a4' 
                   ? 'bg-primary text-white border-primary shadow-xs' 
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
+                  : 'text-gray-700 hover:bg-accent border-border'
               }`}
             >
               Toplu A4 Masa Sayfası (Tüm Masalar)
@@ -419,12 +418,12 @@ export function QRCodesContent() {
             {/* 1. DİKEY AKRİLİK STAND ŞABLONU (10x15cm / A6) */}
             {selectedTemplate === 'acrylic' && (
               <div 
-                className="w-[320px] bg-white rounded-2xl shadow-xl border-4 p-5 flex flex-col items-center justify-between text-center space-y-4 text-gray-900 relative"
+                className="keep-light bg-white w-[320px] rounded-2xl shadow-xl border-4 p-5 flex flex-col items-center justify-between text-center space-y-4 text-gray-900 relative"
                 style={{ borderColor: primaryColor }}
               >
                 {/* Üst Logo & Restoran Adı */}
                 <div className="space-y-1">
-                  <h3 className="font-black text-base tracking-tight text-gray-900 uppercase">
+                  <h3 className="font-black text-base tracking-tight text-foreground uppercase">
                     {currentRestaurant.name}
                   </h3>
                   <div 
@@ -436,7 +435,7 @@ export function QRCodesContent() {
                 </div>
 
                 {/* QR Kod Çerçevesi */}
-                <div className="p-3 bg-white rounded-2xl border-2 border-gray-200 shadow-md flex items-center justify-center w-[176px] h-[176px]">
+                <div className="keep-light bg-white p-3 rounded-2xl border-2 border-gray-200 shadow-md flex items-center justify-center w-[176px] h-[176px]">
                   <QRCodeSVG 
                     value={getTableLink(activePrintTable?.name || '')}
                     size={152}
@@ -447,35 +446,35 @@ export function QRCodesContent() {
 
                 {/* Okutma Yönergesi */}
                 <div className="space-y-0.5">
-                  <p className="font-extrabold text-xs text-gray-800">
+                  <p className="font-extrabold text-xs text-foreground">
                     Menüyü İncelemek İçin Okutun
                   </p>
-                  <p className="text-[10px] text-gray-500">
+                  <p className="text-[10px] text-muted-foreground">
                     Telefonunuzun kamerasını QR koda tutmanız yeterlidir.
                   </p>
                 </div>
 
                 {/* Wi-Fi Bilgisi */}
                 {wifiName && (
-                  <div className="w-full bg-gray-50 p-2 rounded-xl border border-gray-200 text-[10px] space-y-0.5">
+                  <div className="w-full bg-muted/40 p-2 rounded-xl border border-gray-200 text-[10px] space-y-0.5">
                     <div className="flex items-center justify-center space-x-1 font-bold text-gray-700">
                       <Wifi className="h-3 w-3" style={{ color: primaryColor }} />
                       <span>Ücretsiz Wi-Fi</span>
                     </div>
-                    <p className="text-gray-500 font-mono">
-                      Ağ: <strong className="text-gray-800">{wifiName}</strong> {wifiPass && `• Şifre: ${wifiPass}`}
+                    <p className="text-muted-foreground font-mono">
+                      Ağ: <strong className="text-foreground">{wifiName}</strong> {wifiPass && `• Şifre: ${wifiPass}`}
                     </p>
                   </div>
                 )}
 
-                <span className="text-[9px] text-gray-400">Powered by QR Chef</span>
+                <span className="text-[9px] text-muted-foreground">Powered by QR Chef</span>
               </div>
             )}
 
             {/* 2. MASA STICKER ŞABLONU (Dairesel / Kare) */}
             {selectedTemplate === 'sticker' && (
               <div 
-                className="w-[280px] h-[280px] bg-white rounded-3xl shadow-xl border-4 p-4 flex flex-col items-center justify-between text-center text-gray-900"
+                className="keep-light bg-white w-[280px] h-[280px] rounded-3xl shadow-xl border-4 p-4 flex flex-col items-center justify-between text-center text-gray-900"
                 style={{ borderColor: primaryColor }}
               >
                 <div className="flex items-center justify-between w-full px-2">
@@ -488,7 +487,7 @@ export function QRCodesContent() {
                   </span>
                 </div>
 
-                <div className="p-2 bg-white rounded-xl border shadow-xs flex items-center justify-center w-36 h-36">
+                <div className="keep-light bg-white p-2 rounded-xl border shadow-xs flex items-center justify-center w-36 h-36">
                   <QRCodeSVG 
                     value={getTableLink(activePrintTable?.name || '')}
                     size={128}
@@ -505,17 +504,17 @@ export function QRCodesContent() {
 
             {/* 3. TOPLU A4 BASKI SAYFASI (Izgara) */}
             {selectedTemplate === 'bulk_a4' && (
-              <div className="w-full max-w-[700px] bg-white p-6 rounded-xl shadow-lg border text-gray-900 space-y-4">
+              <div className="keep-light bg-white w-full max-w-[700px] p-6 rounded-xl shadow-lg border text-gray-900 space-y-4">
                 <div className="text-center border-b pb-2">
-                  <h3 className="font-black text-lg text-gray-900">{currentRestaurant.name}</h3>
-                  <p className="text-xs text-gray-500">Masa Standı & QR Kod Çıktı Tablosu (A4)</p>
+                  <h3 className="font-black text-lg text-foreground">{currentRestaurant.name}</h3>
+                  <p className="text-xs text-muted-foreground">Masa Standı & QR Kod Çıktı Tablosu (A4)</p>
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
                   {tables.map((tbl) => (
                     <div 
                       key={tbl.id} 
-                      className="border-2 rounded-xl p-3 flex flex-col items-center text-center space-y-1.5 bg-gray-50/50"
+                      className="border-2 rounded-xl p-3 flex flex-col items-center text-center space-y-1.5 bg-muted/40/50"
                       style={{ borderColor: `${primaryColor}40` }}
                     >
                       <span 
@@ -524,7 +523,7 @@ export function QRCodesContent() {
                       >
                         {tbl.name}
                       </span>
-                      <div className="w-24 h-24 bg-white p-1 rounded border flex items-center justify-center">
+                      <div className="keep-light bg-white w-24 h-24 p-1 rounded border flex items-center justify-center">
                         <QRCodeSVG 
                           value={getTableLink(tbl.name)}
                           size={88}
@@ -532,7 +531,7 @@ export function QRCodesContent() {
                           includeMargin={false}
                         />
                       </div>
-                      <span className="text-[9px] text-gray-600 font-bold">Menü İçin Okutun</span>
+                      <span className="text-[9px] text-muted-foreground font-bold">Menü İçin Okutun</span>
                     </div>
                   ))}
                 </div>

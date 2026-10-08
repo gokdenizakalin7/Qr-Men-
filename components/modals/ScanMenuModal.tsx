@@ -23,22 +23,9 @@ import {
 import { Menu, MenuCategory } from '@/lib/types'
 import { motion, AnimatePresence } from 'framer-motion'
 import { compressImageFile, IMAGE_PRESETS } from '@/lib/image-compression'
+import { ScanResultsEditor, type ParsedCategory } from './ScanResultsEditor'
 
 // ─── Tipler ────────────────────────────────────────────────────────────
-
-interface ParsedCategory {
-  name: string
-  items: ParsedItem[]
-}
-
-interface ParsedItem {
-  name: string
-  price: string
-  calories?: number
-  description?: string
-  allergens?: string[]
-  image_url?: string
-}
 
 type Step = 'upload' | 'scanning' | 'results'
 
@@ -73,7 +60,8 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
     if (typeof window !== 'undefined') {
       const role = localStorage.getItem('user_role')
       const isImpersonating = localStorage.getItem('is_admin_impersonating') === 'true' || localStorage.getItem('is_admin') === 'true'
-      setIsAdmin(role === 'superadmin' || role === 'admin' || isImpersonating)
+      // Geliştirme ortamında (npm run dev) test için limit uygulanmaz
+      setIsAdmin(role === 'superadmin' || role === 'admin' || isImpersonating || process.env.NODE_ENV === 'development')
     }
   }, [isOpen])
 
@@ -270,82 +258,8 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
     }
   }
 
-  // Sonuçları düzenleme
-  const updateCategoryName = (catIndex: number, name: string) => {
-    setParsedCategories(prev => {
-      const updated = [...prev]
-      updated[catIndex] = { ...updated[catIndex], name }
-      return updated
-    })
-  }
-
-  const updateItemName = (catIndex: number, itemIndex: number, name: string) => {
-    setParsedCategories(prev => {
-      const updated = [...prev]
-      const items = [...updated[catIndex].items]
-      items[itemIndex] = { ...items[itemIndex], name }
-      updated[catIndex] = { ...updated[catIndex], items }
-      return updated
-    })
-  }
-
-  const updateItemPrice = (catIndex: number, itemIndex: number, price: string) => {
-    setParsedCategories(prev => {
-      const updated = [...prev]
-      const items = [...updated[catIndex].items]
-      items[itemIndex] = { ...items[itemIndex], price }
-      updated[catIndex] = { ...updated[catIndex], items }
-      return updated
-    })
-  }
-
-  const updateItemImage = (catIndex: number, itemIndex: number, image_url: string) => {
-    setParsedCategories(prev => {
-      const updated = [...prev]
-      const items = [...updated[catIndex].items]
-      items[itemIndex] = { ...items[itemIndex], image_url }
-      updated[catIndex] = { ...updated[catIndex], items }
-      return updated
-    })
-  }
-
-  const updateItemDescription = (catIndex: number, itemIndex: number, description: string) => {
-    setParsedCategories(prev => {
-      const updated = [...prev]
-      const items = [...updated[catIndex].items]
-      items[itemIndex] = { ...items[itemIndex], description }
-      updated[catIndex] = { ...updated[catIndex], items }
-      return updated
-    })
-  }
-
-  const updateItemAllergens = (catIndex: number, itemIndex: number, allergensStr: string) => {
-    const allergens = allergensStr.split(',').map(a => a.trim()).filter(Boolean)
-    setParsedCategories(prev => {
-      const updated = [...prev]
-      const items = [...updated[catIndex].items]
-      items[itemIndex] = { ...items[itemIndex], allergens }
-      updated[catIndex] = { ...updated[catIndex], items }
-      return updated
-    })
-  }
-
-  const deleteItem = (catIndex: number, itemIndex: number) => {
-    setParsedCategories(prev => {
-      const updated = [...prev]
-      const items = [...updated[catIndex].items]
-      items.splice(itemIndex, 1)
-      updated[catIndex] = { ...updated[catIndex], items }
-      return updated
-    })
-  }
-
-  const deleteCategory = (catIndex: number) => {
-    setParsedCategories(prev => prev.filter((_, i) => i !== catIndex))
-  }
-
   // Menüyü Oluştur
-  const createMenu = async () => {
+  const createMenu = async (finalMenuName: string, finalCategories: ParsedCategory[]) => {
     let coverUrl = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=400&fit=crop'
     if (photos[0]?.file) {
       try {
@@ -356,7 +270,7 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
       }
     }
 
-    const categories: MenuCategory[] = parsedCategories
+    const categories: MenuCategory[] = finalCategories
       .filter(cat => cat.items.length > 0)
       .map((cat, catIdx) => ({
         id: `cat-${Date.now()}-${catIdx}`,
@@ -367,9 +281,10 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
         items: cat.items.map((item, itemIdx) => ({
           id: `item-${Date.now()}-${catIdx}-${itemIdx}`,
           name: item.name,
-          description: '',
+          description: item.description || '',
           price: item.price,
-          image_url: '',
+          image_url: item.image_url || '',
+          allergens: item.allergens && item.allergens.length > 0 ? item.allergens : undefined,
           calories: item.calories || undefined,
           display_order: itemIdx + 1,
           is_available: true
@@ -379,7 +294,7 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
     const totalItems = categories.reduce((sum, c) => sum + c.items.length, 0)
 
     onMenuCreated({
-      name: menuName || 'Taranan Menü',
+      name: finalMenuName || 'Taranan Menü',
       description: `${categories.length} kategori, ${totalItems} ürün — fotoğraftan yapay zeka ile taranarak oluşturuldu`,
       image_url: coverUrl,
       is_listed: true,
@@ -391,6 +306,22 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
   }
 
   const totalParsedItems = parsedCategories.reduce((sum, c) => sum + c.items.length, 0)
+
+  if (isOpen && step === 'results') {
+    return (
+      <ScanResultsEditor
+        initialMenuName={menuName}
+        initialCategories={parsedCategories}
+        photos={photos.map((p) => ({ id: p.id, preview: p.preview }))}
+        onBack={() => {
+          setStep('upload')
+          setError(null)
+        }}
+        onCancel={handleClose}
+        onCreate={createMenu}
+      />
+    )
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -628,164 +559,6 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
               </motion.div>
             )}
 
-            {/* ─── ADIM 3: SONUÇLAR & DÜZENLEME ─── */}
-            {step === 'results' && (
-              <motion.div
-                key="results"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-4"
-              >
-                {/* Başarı Bilgisi */}
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-50 border border-emerald-200">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold text-emerald-800">Tarama Başarıyla Tamamlandı!</p>
-                    <p className="text-xs text-emerald-600">
-                      {parsedCategories.length} kategori ve {totalParsedItems} ürün tespit edildi. Aşağıdan düzenleyebilirsiniz.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Menü Adı */}
-                <div className="space-y-1.5">
-                  <Label htmlFor="scan-menu-name" className="text-xs font-semibold">Menü Adı</Label>
-                  <Input
-                    id="scan-menu-name"
-                    value={menuName}
-                    onChange={(e) => setMenuName(e.target.value)}
-                    placeholder="Taranan Menü"
-                    className="h-9"
-                  />
-                </div>
-
-                {/* Kategoriler ve Ürünler */}
-                <div className="space-y-3 max-h-[45vh] overflow-y-auto pr-1">
-                  {parsedCategories.map((cat, catIdx) => (
-                    <div key={catIdx} className="rounded-lg border bg-white shadow-sm overflow-hidden">
-                      {/* Kategori Başlığı */}
-                      <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b">
-                        <div className="w-6 h-6 rounded bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-bold shrink-0">
-                          {catIdx + 1}
-                        </div>
-                        <Input
-                          value={cat.name}
-                          onChange={(e) => updateCategoryName(catIdx, e.target.value)}
-                          className="h-7 text-sm font-bold border-0 bg-transparent shadow-none px-1 focus-visible:ring-1"
-                        />
-                        <span className="text-[11px] text-gray-400 font-medium whitespace-nowrap">
-                          {cat.items.length} ürün
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 shrink-0 text-red-400 hover:text-red-600 hover:bg-red-50"
-                          onClick={() => deleteCategory(catIdx)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-
-                      {/* Ürünler */}
-                      <div className="divide-y">
-                        {cat.items.map((item, itemIdx) => (
-                          <div key={itemIdx} className="flex flex-col gap-2 px-3 py-3 hover:bg-gray-50/50 group border-b last:border-b-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-gray-400 font-mono w-4 shrink-0">{itemIdx + 1}</span>
-                              <Input
-                                value={item.name}
-                                onChange={(e) => updateItemName(catIdx, itemIdx, e.target.value)}
-                                className="h-7 text-sm font-semibold border-0 bg-transparent shadow-none px-1 flex-1 focus-visible:ring-1"
-                                placeholder="Ürün adı"
-                              />
-                              {item.calories ? (
-                                <span className="text-[10px] text-orange-600 font-bold bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100 whitespace-nowrap flex items-center gap-0.5">
-                                  🔥 {item.calories} kcal
-                                </span>
-                              ) : (
-                                <span className="text-[10px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 whitespace-nowrap">
-                                  — kcal
-                                </span>
-                              )}
-                              <Input
-                                value={item.price}
-                                onChange={(e) => updateItemPrice(catIdx, itemIdx, e.target.value)}
-                                className="h-7 text-sm font-bold text-violet-700 border-0 bg-transparent shadow-none px-1 w-24 text-right focus-visible:ring-1"
-                                placeholder="Fiyat (ör: 50 ₺)"
-                              />
-                              <button
-                                onClick={() => deleteItem(catIdx, itemIdx)}
-                                className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                            
-                            <div className="flex gap-2 pl-6 pt-1">
-                              <Input
-                                value={item.description || ''}
-                                onChange={(e) => updateItemDescription(catIdx, itemIdx, e.target.value)}
-                                className="h-7 text-[11px] text-gray-500 border-0 bg-transparent shadow-none px-1 flex-1 focus-visible:ring-1"
-                                placeholder="Açıklama (opsiyonel)"
-                              />
-                              <div className="flex gap-1">
-                                <div className="relative w-40">
-                                  <Input
-                                    value={item.image_url || ''}
-                                    onChange={(e) => updateItemImage(catIdx, itemIdx, e.target.value)}
-                                    className="h-7 text-[10px] text-gray-500 border-dashed bg-white px-2 focus-visible:ring-1"
-                                    placeholder="Görsel URL (opsiyonel)"
-                                  />
-                                </div>
-                                <div className="relative w-40">
-                                  <Input
-                                    value={(item.allergens || []).join(', ')}
-                                    onChange={(e) => updateItemAllergens(catIdx, itemIdx, e.target.value)}
-                                    className="h-7 text-[10px] text-gray-500 border-dashed bg-white px-2 pr-6 focus-visible:ring-1"
-                                    placeholder="Alerjenler (virgülle)"
-                                  />
-                                  <span className="absolute right-2 top-1.5 text-[10px] text-gray-400 pointer-events-none">⚠️</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                        {cat.items.length === 0 && (
-                          <p className="px-3 py-3 text-xs text-gray-400 italic">Bu kategoride ürün bulunamadı</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Aksiyon Butonları */}
-                <div className="flex justify-between items-center gap-2 pt-3 border-t">
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => {
-                      setStep('upload')
-                      setError(null)
-                    }}
-                    className="text-gray-600"
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-1.5" /> Geri Dön
-                  </Button>
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={handleClose}>Vazgeç</Button>
-                    <Button
-                      onClick={createMenu}
-                      disabled={parsedCategories.filter(c => c.items.length > 0).length === 0}
-                      className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-semibold"
-                    >
-                      <CheckCircle2 className="h-4 w-4 mr-2" /> Menüyü Oluştur
-                    </Button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
 
           </AnimatePresence>
         </div>

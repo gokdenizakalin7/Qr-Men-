@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { authFetch } from '@/lib/api-client'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -46,11 +46,11 @@ import { getStoredMenus, setStoredMenus } from '@/lib/mock-data'
 import { PRESET_MENU_TEMPLATES, MenuTemplate } from '@/lib/menu-templates'
 import { sanitizeText, sanitizeMultilineText, sanitizePrice } from '@/lib/sanitizer'
 import { ScanMenuModal } from '@/components/modals/ScanMenuModal'
+import { setScrollNavGuard } from '@/components/dashboard/ScrollNavigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { compressImageFile, IMAGE_PRESETS, formatFileSize } from '@/lib/image-compression'
 import { safeJsonParse } from '@/lib/utils'
-import { authFetch } from '@/lib/api-client'
 
 // KURUMSAL & SEO UYUMLU ANA KATEGORİ REHBERİ
 export const ORDERED_CATEGORY_GROUPS = [
@@ -233,6 +233,9 @@ export function LiveMenuEditor() {
     return list[0]
   })
 
+  // Veritabanındaki son kayıtlı sürümün JSON'u (null = henüz yüklenmedi)
+  const [lastSavedJson, setLastSavedJson] = useState<string | null>(null)
+
   // SUPABASE'TEN YÜKLEME
   useEffect(() => {
     async function loadFromSupabase() {
@@ -242,14 +245,12 @@ export function LiveMenuEditor() {
         if (res.ok) {
           const data = await res.json()
           if (data.menus && data.menus.length > 0) {
-            if (menuIdParam) {
-              const found = data.menus.find((m: Menu) => m.id === menuIdParam)
-              setMenu(found || data.menus[0])
-            } else {
-              setMenu(data.menus[0])
-            }
+            const loaded: Menu = (menuIdParam && data.menus.find((m: Menu) => m.id === menuIdParam)) || data.menus[0]
+            setMenu(loaded)
+            setLastSavedJson(JSON.stringify(loaded))
             setStoredMenus(subdomain, data.menus)
           } else {
+            setLastSavedJson(prev => prev ?? '__none__')
             // Veritabanında menü yoksa boş state'i göster; ancak kullanıcının bu sırada
             // oluşturduğu (henüz geçici kimlikli) menüyü geç gelen boş yanıtla ezme.
             setMenu(prev => (prev && prev.id.startsWith('menu-') ? prev : null))
@@ -271,6 +272,39 @@ export function LiveMenuEditor() {
   const [previewSearch, setPreviewSearch] = useState<string>('')
   const [previewSelectedItem, setPreviewSelectedItem] = useState<MenuItem | null>(null)
   const [wifiCopied, setWifiCopied] = useState(false)
+
+  // Müşterinin gördüğü gerçek menü sayfasını iframe içinde gösterir; düzenlemeler postMessage ile aktarılır
+  const previewIframeRef = useRef<HTMLIFrameElement>(null)
+  const sendPreviewData = React.useCallback(() => {
+    previewIframeRef.current?.contentWindow?.postMessage(
+      {
+        type: 'qr-preview-data',
+        menu,
+        primaryColor,
+        restaurant: {
+          id: currentRestaurant?.id,
+          name: currentRestaurant?.name,
+          cover_url: currentRestaurant?.branding?.bannerUrl,
+          address: currentRestaurant?.businessInfo?.address,
+          city: currentRestaurant?.businessInfo?.city,
+          wifi_name: currentRestaurant?.businessInfo?.wifi_name,
+          wifi_password: currentRestaurant?.businessInfo?.wifi_password,
+          branding: { primaryColor },
+        },
+      },
+      window.location.origin
+    )
+  }, [menu, primaryColor, currentRestaurant])
+  useEffect(() => {
+    sendPreviewData()
+  }, [sendPreviewData])
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin === window.location.origin && e.data?.type === 'qr-preview-ready') sendPreviewData()
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [sendPreviewData])
   const [savedSuccess, setSavedSuccess] = useState(false)
 
   // HAZIR MENÜ ŞABLONU MODALI STATE'İ
@@ -327,16 +361,70 @@ export function LiveMenuEditor() {
   }, [menu, subdomain])
 
   // Sunucunun verdiği gerçek menü kimliğini uygula (geçici "menu-..." kimliği kopya menü üretmesin)
-  const adoptServerIds = async (res: Response) => {
+  const adoptServerIds = async (res: Response, savedMenu?: Menu): Promise<Record<string, string>> => {
+    let idMap: Record<string, string> = {}
     try {
       const data = await res.clone().json()
-      const idMap: Record<string, string> = data?.idMap || {}
-      if (Object.keys(idMap).length === 0) return
-      setMenu(prev => (prev && idMap[prev.id] ? { ...prev, id: idMap[prev.id] } : prev))
+      idMap = data?.idMap || {}
     } catch {
       // yanıt JSON değilse yok say
     }
+    if (Object.keys(idMap).length > 0) {
+      setMenu(prev => (prev && idMap[prev.id] ? { ...prev, id: idMap[prev.id] } : prev))
+    }
+    // Başarıyla kaydedilen sürümü "temiz" olarak işaretle
+    if (savedMenu) {
+      const finalMenu = idMap[savedMenu.id] ? { ...savedMenu, id: idMap[savedMenu.id] } : savedMenu
+      setLastSavedJson(JSON.stringify(finalMenu))
+    }
+    return idMap
   }
+
+  // Sayfadan ayrılma uyarısı (site içi pencere) için bekleyen hedef
+  const [pendingHref, setPendingHref] = useState<string | null>(null)
+  const [isSavingBeforeLeave, setIsSavingBeforeLeave] = useState(false)
+
+  // KAYDEDİLMEMİŞ DEĞİŞİKLİK TAKİBİ
+  const isDirty = useMemo(() => {
+    if (isLoading || !menu || lastSavedJson === null) return false
+    return JSON.stringify(menu) !== lastSavedJson
+  }, [menu, lastSavedJson, isLoading])
+
+  // Sekmeyi kapatma / sayfayı yenileme uyarısı
+  useEffect(() => {
+    if (!isDirty) return
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [isDirty])
+
+  // Uygulama içi sayfa geçişi (sol menü vb.) uyarısı
+  useEffect(() => {
+    if (!isDirty) return
+    const onClickCapture = (e: MouseEvent) => {
+      const anchor = (e.target as HTMLElement | null)?.closest?.('a[href]') as HTMLAnchorElement | null
+      if (!anchor || anchor.target === '_blank') return
+      const href = anchor.getAttribute('href') || ''
+      if (!href || href.startsWith('#') || /^(https?:|mailto:|tel:)/.test(href)) return
+      if (href === window.location.pathname + window.location.search) return
+      // Tarayıcı penceresi yerine site içi uyarı göster
+      e.preventDefault()
+      e.stopPropagation()
+      setPendingHref(href)
+    }
+    document.addEventListener('click', onClickCapture, true)
+    setScrollNavGuard((to) => {
+      setPendingHref(to)
+      return true
+    })
+    return () => {
+      document.removeEventListener('click', onClickCapture, true)
+      setScrollNavGuard(null)
+    }
+  }, [isDirty])
 
   // HAZIR MENÜ ŞABLONUNU YÜKLE
   const handleApplyTemplate = (tmpl: MenuTemplate) => {
@@ -373,7 +461,7 @@ export function LiveMenuEditor() {
       body: JSON.stringify({ subdomain, menus: [newMenu] })
     }).then(async res => {
       if (res.ok) {
-        await adoptServerIds(res)
+        await adoptServerIds(res, newMenu)
         setSavedSuccess(true)
         setTimeout(() => setSavedSuccess(false), 3000)
         toast.success('Şablon başarıyla uygulandı ve kaydedildi.')
@@ -420,7 +508,7 @@ export function LiveMenuEditor() {
       body: JSON.stringify({ subdomain, menus: [blankMenu] })
     }).then(async res => {
       if (res.ok) {
-        await adoptServerIds(res)
+        await adoptServerIds(res, blankMenu)
         setSavedSuccess(true)
         setTimeout(() => setSavedSuccess(false), 3000)
         toast.success('Boş menü başarıyla oluşturuldu.')
@@ -682,7 +770,7 @@ export function LiveMenuEditor() {
   const handleDeleteItem = (catId: string, itemId: string) => {
     setMenu(prev => prev ? ({
       ...prev,
-      categories: prev.categories.map(cat => 
+      categories: prev.categories.map(cat =>
         cat.id === catId ? { ...cat, items: cat.items.filter(i => i.id !== itemId) } : cat
       )
     }) : null)
@@ -767,8 +855,8 @@ export function LiveMenuEditor() {
     setMenu(prev => prev ? ({ ...prev, categories: newCats }) : null)
   }
 
-  const handleSaveAll = async () => {
-    if (!menu) return
+  const handleSaveAll = async (): Promise<boolean> => {
+    if (!menu) return false
     
     // Draft as backup
     setStoredMenus(subdomain, [menu])
@@ -783,15 +871,51 @@ export function LiveMenuEditor() {
         const err = await res.json()
         throw new Error(err.error || 'Failed to save to Supabase')
       }
-      
+
+      await adoptServerIds(res, menu)
       setSavedSuccess(true)
       setTimeout(() => setSavedSuccess(false), 2500)
       toast.success('Menü başarıyla kaydedildi.')
+      return true
     } catch (e: any) {
       console.error(e)
       toast.error(`Menü kaydedilirken hata oluştu: ${e.message}`)
+      return false
     }
   }
+
+  const handleSaveAndLeave = async () => {
+    if (!pendingHref) return
+    setIsSavingBeforeLeave(true)
+    const ok = await handleSaveAll()
+    setIsSavingBeforeLeave(false)
+    if (ok) {
+      const target = pendingHref
+      setPendingHref(null)
+      navigate(target)
+    }
+  }
+
+  const handleLeaveWithoutSaving = () => {
+    if (!pendingHref) return
+    const target = pendingHref
+    setPendingHref(null)
+    navigate(target)
+  }
+
+  // Ctrl/Cmd + S ile kaydet
+  const saveAllRef = useRef(handleSaveAll)
+  saveAllRef.current = handleSaveAll
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        saveAllRef.current()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   const activeCategoriesForPreview = menu ? menu.categories.filter(c => c.is_active) : []
   const filteredPreviewCategories = activeCategoriesForPreview.map(cat => {
@@ -818,8 +942,8 @@ export function LiveMenuEditor() {
   return (
     <div className="space-y-6">
       {/* Üst Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border shadow-sm">
-        <div>
+      <div className="glass-card flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-4">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-gray-900 flex items-center">
             <Utensils className="mr-2 h-6 w-6 text-primary" /> Canlı Menü ve Kategori Editörü
           </h1>
@@ -827,7 +951,7 @@ export function LiveMenuEditor() {
             Kurumsal gastronomi standartlarında ana kategorilerle menünüzü yapılandırabilir veya hazır şablonları yükleyebilirsiniz.
           </p>
         </div>
-        <div className="flex items-center space-x-2.5">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
           <Button 
             variant="outline" 
             size="sm" 
@@ -840,7 +964,7 @@ export function LiveMenuEditor() {
             variant="outline" 
             size="sm" 
             onClick={() => setIsScanMenuModalOpen(true)}
-            className="border-violet-400 text-violet-700 hover:bg-violet-50 font-semibold"
+            className="scan-attention border-violet-500/40 bg-violet-500/10 text-violet-700 hover:bg-violet-500/20 hover:text-violet-800 dark:border-violet-400/40 dark:bg-violet-400/10 dark:text-violet-200 dark:hover:bg-violet-400/20 dark:hover:text-violet-100 font-semibold"
           >
             <Camera className="h-4 w-4 mr-1.5" /> Kendi Menünü Tara
           </Button>
@@ -851,9 +975,12 @@ export function LiveMenuEditor() {
                   <ExternalLink className="h-4 w-4 mr-1.5" /> Canlı Menü
                 </a>
               </Button>
-              <Button onClick={handleSaveAll} className="bg-primary text-white">
+              <Button
+                onClick={handleSaveAll}
+                className={isDirty ? 'bg-amber-500 hover:bg-amber-600 text-white animate-pulse' : 'bg-primary text-white'}
+              >
                 {savedSuccess ? <Check className="h-4 w-4 mr-1.5 text-green-300" /> : <Save className="h-4 w-4 mr-1.5" />}
-                {savedSuccess ? 'Kaydedildi!' : 'Kaydet'}
+                {savedSuccess ? 'Kaydedildi!' : isDirty ? 'Kaydet (değişiklik var)' : 'Kaydet'}
               </Button>
             </>
           ) : (
@@ -864,8 +991,48 @@ export function LiveMenuEditor() {
         </div>
       </div>
 
+      {/* Sayfadan ayrılırken kaydedilmemiş değişiklik uyarısı (site içi) */}
+      <Dialog open={pendingHref !== null} onOpenChange={(open) => { if (!open) setPendingHref(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700">
+              <AlertCircle className="h-5 w-5" /> Kaydedilmemiş değişiklikler var
+            </DialogTitle>
+            <DialogDescription>
+              Menüde yaptığınız değişiklikleri henüz kaydetmediniz. Kaydetmeden çıkarsanız bu değişiklikler kaybolacak.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col-reverse sm:flex-row sm:flex-wrap sm:justify-end gap-2 pt-2">
+            <Button variant="ghost" onClick={() => setPendingHref(null)} disabled={isSavingBeforeLeave} className="w-full sm:w-auto">
+              Düzenlemeye Devam Et
+            </Button>
+            <Button variant="outline" onClick={handleLeaveWithoutSaving} disabled={isSavingBeforeLeave} className="w-full sm:w-auto text-red-600 border-red-200 hover:bg-red-50">
+              Kaydetmeden Çık
+            </Button>
+            <Button onClick={handleSaveAndLeave} disabled={isSavingBeforeLeave} className="w-full sm:w-auto bg-primary text-white">
+              <Save className="h-4 w-4 mr-1.5" /> {isSavingBeforeLeave ? 'Kaydediliyor...' : 'Kaydet ve Çık'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Kaydedilmemiş değişiklik çubuğu (her zaman görünür) */}
+      {isDirty && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex w-[calc(100%-1.5rem)] max-w-md items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 shadow-2xl">
+          <div className="flex min-w-0 items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
+            <span className="text-sm font-semibold text-amber-900 leading-tight">
+              Kaydedilmemiş değişiklikleriniz var
+            </span>
+          </div>
+          <Button size="sm" onClick={handleSaveAll} className="shrink-0 bg-amber-500 hover:bg-amber-600 text-white font-bold">
+            <Save className="h-4 w-4 mr-1.5" /> Şimdi Kaydet
+          </Button>
+        </div>
+      )}
+
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border border-gray-200 shadow-sm mt-6">
+        <div className="glass-card flex flex-col items-center justify-center py-24 mt-6">
           <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4"></div>
           <p className="text-gray-500 font-medium">Menü verileri yükleniyor...</p>
         </div>
@@ -906,7 +1073,7 @@ export function LiveMenuEditor() {
             <Button 
               size="lg" 
               onClick={() => setIsScanMenuModalOpen(true)}
-              className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold px-6 py-6 text-base shadow-md w-full sm:w-auto"
+              className="scan-attention bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold px-6 py-6 text-base shadow-md w-full sm:w-auto"
             >
               <Camera className="h-5 w-5 mr-2" /> Kendi Menünü Tara
             </Button>
@@ -955,10 +1122,10 @@ export function LiveMenuEditor() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
         {/* SOL BÖLÜM: KATEGORİ & ÜRÜN YÖNETİMİ */}
-        <div className="lg:col-span-7 space-y-6">
+        <div className="lg:col-span-7 min-w-0 space-y-6">
           
           {/* Menü Başlığı & Renk */}
-          <Card className="bg-white shadow-sm">
+          <Card>
             <CardHeader className="py-3 px-4 bg-gray-50 border-b flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-bold text-gray-900">Menü Başlığı & Tema Rengi</CardTitle>
@@ -1000,12 +1167,12 @@ export function LiveMenuEditor() {
 
           {/* Kategoriler Listesi */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
                 <h2 className="text-lg font-bold text-gray-900">Menü Kategorileri</h2>
                 <p className="text-xs text-gray-500">Kategorileri açıp kapatabilir, sıralayabilir ve ürün ekleyebilirsiniz.</p>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button size="sm" variant="outline" onClick={() => setIsTemplateModalOpen(true)}>
                   <BookOpen className="h-3.5 w-3.5 mr-1 text-primary" /> Şablon Yükle
                 </Button>
@@ -1016,7 +1183,7 @@ export function LiveMenuEditor() {
             </div>
 
             {menu.categories.length === 0 && (
-              <Card className="p-8 text-center bg-white border-dashed">
+              <Card className="p-8 text-center border-dashed">
                 <Utensils className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                 <p className="font-semibold text-gray-700">Henüz kategori eklenmemiş</p>
                 <p className="text-xs text-gray-400 mb-4">Sıfırdan kategori ekleyebilir veya hazır profesyonel bir şablon yükleyebilirsiniz.</p>
@@ -1034,25 +1201,25 @@ export function LiveMenuEditor() {
                 key={category.id} 
                 className={`transition-all border ${
                   category.is_active 
-                    ? 'bg-white shadow-sm border-gray-200' 
-                    : 'bg-gray-50/80 border-dashed border-gray-300 opacity-75'
+                    ? 'shadow-sm'
+                    : 'border-dashed opacity-75'
                 }`}
               >
                 {/* Kategori Başlık ve Kontrol Barı */}
-                <div className="p-3.5 bg-gray-50/90 border-b flex flex-wrap items-center justify-between gap-2">
+                <div className="p-3.5 bg-muted/60 text-foreground border-b border-border flex flex-wrap items-center justify-between gap-2 rounded-t-2xl">
                   <div className="flex items-center space-x-2.5">
                     <div className="flex flex-col">
                       <button 
                         onClick={() => moveCategory(index, 'up')} 
                         disabled={index === 0}
-                        className="text-gray-400 hover:text-gray-700 disabled:opacity-20 p-0.5"
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-20 p-0.5"
                       >
                         <ChevronUp className="h-3.5 w-3.5" />
                       </button>
                       <button 
                         onClick={() => moveCategory(index, 'down')} 
                         disabled={index === menu.categories.length - 1}
-                        className="text-gray-400 hover:text-gray-700 disabled:opacity-20 p-0.5"
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-20 p-0.5"
                       >
                         <ChevronDown className="h-3.5 w-3.5" />
                       </button>
@@ -1060,23 +1227,23 @@ export function LiveMenuEditor() {
 
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="font-bold text-gray-900 text-sm">{category.name}</span>
-                        <span className="text-[11px] text-gray-500">({category.items.length} Ürün)</span>
+                        <span className="font-bold text-foreground text-sm">{category.name}</span>
+                        <span className="text-[11px] text-muted-foreground">({category.items.length} Ürün)</span>
                       </div>
                       {category.description && (
-                        <p className="text-xs text-gray-500 line-clamp-1">{category.description}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-1">{category.description}</p>
                       )}
                     </div>
                   </div>
 
                   {/* Kategori Butonları */}
-                  <div className="flex items-center space-x-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={() => toggleCategoryActive(category.id)}
                       className={`text-xs px-3 py-1.5 rounded-full font-bold flex items-center gap-1.5 transition-all shadow-xs ${
                         category.is_active
-                          ? 'bg-green-600 text-white hover:bg-green-700'
-                          : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+                          ? 'bg-green-600 text-white hover:bg-green-700 dark:bg-green-500/90 dark:text-white dark:hover:bg-green-500'
+                          : 'bg-muted text-muted-foreground border border-border hover:bg-accent hover:text-foreground'
                       }`}
                       title={category.is_active ? 'Kategoriyi gizle (Pasif)' : 'Kategoriyi göster (Aktif)'}
                     >
@@ -1094,7 +1261,7 @@ export function LiveMenuEditor() {
                     <Button 
                       size="sm" 
                       variant="outline" 
-                      className="h-7 text-xs bg-white"
+                      className="h-7 text-xs bg-background text-foreground border-border hover:bg-accent"
                       onClick={() => openAddItemModal(category.id)}
                     >
                       <Plus className="h-3.5 w-3.5 mr-1" /> Ürün Ekle
@@ -1103,7 +1270,7 @@ export function LiveMenuEditor() {
                     <Button 
                       size="icon" 
                       variant="ghost" 
-                      className="h-7 w-7 text-gray-500 hover:text-gray-900"
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-accent"
                       onClick={() => {
                         setEditingCategory(category)
                         setSelectedCategoryName(category.name)
@@ -1118,7 +1285,7 @@ export function LiveMenuEditor() {
                     <Button 
                       size="icon" 
                       variant="ghost" 
-                      className="h-7 w-7 text-red-500 hover:bg-red-50"
+                      className="h-7 w-7 text-red-500 hover:bg-red-500/10 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
                       onClick={() => handleDeleteCategory(category.id)}
                       title="Kategoriyi Sil"
                     >
@@ -1128,15 +1295,15 @@ export function LiveMenuEditor() {
                 </div>
 
                 {/* Kategori Ürünleri */}
-                <CardContent className="p-0 sm:p-3">
+                <CardContent className="p-0 sm:p-3 overflow-x-auto">
                   {category.items.length === 0 ? (
                     <div className="text-center py-4 text-xs text-gray-400 italic">
                       Bu kategoride henüz ürün yok. "Ürün Ekle" butonuna basarak ilk lezzetinizi ekleyin.
                     </div>
                   ) : (
-                    <div className="flex flex-col">
+                    <div className="flex flex-col min-w-[560px]">
                       {/* KOLON BAŞLIKLARI */}
-                      <div className="grid grid-cols-[8fr_3fr_2fr_4fr_2fr] gap-2 px-3 py-2 bg-gray-50 border-y text-[10px] font-bold text-gray-500 uppercase">
+                      <div className="grid grid-cols-[8fr_3fr_2fr_4fr_2fr] gap-2 px-3 py-2 bg-muted/40 border-y border-border text-[10px] font-bold text-muted-foreground uppercase">
                         <div>Ürün</div>
                         <div className="text-center">Fiyat</div>
                         <div className="text-center">Kalori</div>
@@ -1144,9 +1311,9 @@ export function LiveMenuEditor() {
                         <div className="text-right">İşlemler</div>
                       </div>
                       
-                      <div className="divide-y">
+                      <div className="divide-y divide-border">
                         {category.items.map((item) => (
-                          <div key={item.id} className="grid grid-cols-[8fr_3fr_2fr_4fr_2fr] items-center gap-2 p-3 hover:bg-gray-50/50 transition-colors">
+                          <div key={item.id} className="grid grid-cols-[8fr_3fr_2fr_4fr_2fr] items-center gap-2 p-3 hover:bg-accent/50 transition-colors">
                             {/* 1. ÜRÜN BİLGİSİ */}
                             <div className="flex items-center space-x-3 overflow-hidden">
                               {item.image_url ? (
@@ -1162,14 +1329,14 @@ export function LiveMenuEditor() {
                               )}
                               <div className="min-w-0">
                                 <div className="flex items-center space-x-1.5">
-                                  <span className="font-semibold text-xs text-gray-900 truncate">{item.name}</span>
+                                  <span className="font-semibold text-xs text-foreground truncate">{item.name}</span>
                                   {item.is_featured && (
                                     <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded flex items-center shrink-0">
                                       <Star className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-[10px] text-gray-500 line-clamp-1">{item.description}</p>
+                                <p className="text-[10px] text-muted-foreground line-clamp-1">{item.description}</p>
                               </div>
                             </div>
 
@@ -1239,7 +1406,7 @@ export function LiveMenuEditor() {
                               <Button 
                                 size="icon" 
                                 variant="ghost" 
-                                className="h-7 w-7 text-gray-500 hover:text-gray-900"
+                                className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-accent"
                                 onClick={() => openAddItemModal(category.id, item)}
                                 title="Detaylı Düzenle"
                               >
@@ -1279,217 +1446,19 @@ export function LiveMenuEditor() {
           </div>
 
           {/* TELEFON ÇERÇEVESİ */}
-          <div className="w-full max-w-[360px] h-[720px] bg-black rounded-[48px] p-3.5 shadow-2xl border-4 border-gray-800 relative flex flex-col justify-between overflow-hidden">
+          <div className="keep-light w-full max-w-[360px] h-[720px] bg-black rounded-[48px] p-3.5 shadow-2xl border-4 border-gray-800 relative flex flex-col justify-between overflow-hidden">
             
             <div className="absolute top-5 left-1/2 -translate-x-1/2 w-28 h-5 bg-black rounded-full z-50 flex items-center justify-center">
               <div className="w-2.5 h-2.5 bg-gray-900 rounded-full mr-2"></div>
               <div className="w-2 h-2 bg-blue-950 rounded-full"></div>
             </div>
 
-            <div className="w-full h-full bg-gray-50 rounded-[38px] overflow-y-auto overflow-x-hidden text-gray-900 flex flex-col justify-between scrollbar-thin select-none">
-              
-              <div>
-                <div className="px-6 pt-3 pb-1 flex justify-between items-center text-[10px] text-gray-800 font-bold">
-                  <span>12:30</span>
-                  <div className="flex items-center space-x-1">
-                    <Wifi className="h-2.5 w-2.5" />
-                    <span>%98</span>
-                  </div>
-                </div>
-
-                <div className="relative h-28 w-full bg-gray-800 overflow-hidden">
-                  <img 
-                    src={menu.image_url} 
-                    alt="Kapak"
-                    className="w-full h-full object-cover opacity-70"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex flex-col justify-end p-3 text-white">
-                    <span className="text-sm font-extrabold line-clamp-1">{currentRestaurant?.name || 'Lezzet Restoran'}</span>
-                    <span className="text-[10px] text-gray-200 line-clamp-1">{menu.name}</span>
-                  </div>
-                </div>
-
-                {currentRestaurant?.businessInfo?.wifi_name && (
-                  <div className="mx-3 mt-2.5 p-2 bg-white rounded-xl border shadow-2xs flex items-center justify-between text-[11px]">
-                    <div className="flex items-center space-x-1.5 text-gray-600">
-                      <Wifi className="h-3.5 w-3.5" style={{ color: primaryColor }} />
-                      <span className="truncate max-w-[170px]">
-                        Wi-Fi: <strong className="text-gray-900">{currentRestaurant.businessInfo.wifi_name}</strong>
-                      </span>
-                    </div>
-                    <button 
-                      onClick={() => {
-                        setWifiCopied(true)
-                        setTimeout(() => setWifiCopied(false), 2000)
-                      }}
-                      className="text-[10px] bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded font-mono"
-                    >
-                      {wifiCopied ? 'Kopyalandı' : 'Şifre'}
-                    </button>
-                  </div>
-                )}
-
-                <div className="px-3 pt-2">
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-gray-400" />
-                    <input
-                      placeholder="Yemek veya içecek ara..."
-                      className="w-full pl-7 pr-2 py-1.5 text-xs bg-white rounded-lg border focus:outline-none"
-                      value={previewSearch}
-                      onChange={(e) => setPreviewSearch(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {/* Canlı Kategori Sekmeleri */}
-                <div className="px-3 pt-2.5">
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                    <button
-                      onClick={() => setPreviewCategory('all')}
-                      className="text-[11px] px-2.5 py-1 rounded-full font-semibold shrink-0 transition-all text-white"
-                      style={{
-                        backgroundColor: previewCategory === 'all' ? primaryColor : '#e5e7eb',
-                        color: previewCategory === 'all' ? '#ffffff' : '#374151'
-                      }}
-                    >
-                      Tümü
-                    </button>
-                    {activeCategoriesForPreview.map(cat => (
-                      <button
-                        key={cat.id}
-                        onClick={() => setPreviewCategory(cat.id)}
-                        className="text-[11px] px-2.5 py-1 rounded-full font-semibold shrink-0 transition-all"
-                        style={{
-                          backgroundColor: previewCategory === cat.id ? primaryColor : '#e5e7eb',
-                          color: previewCategory === cat.id ? '#ffffff' : '#374151'
-                        }}
-                      >
-                        {cat.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Telefon Menü İçeriği */}
-                <div className="p-3 space-y-3">
-                  {filteredPreviewCategories.length === 0 ? (
-                    <div className="text-center py-8 text-xs text-gray-400">
-                      {activeCategoriesForPreview.length === 0 
-                        ? 'Tüm kategoriler pasif durumda. Soldan en az bir kategoriyi aktif yapın.'
-                        : 'Aramanıza uygun ürün bulunamadı.'}
-                    </div>
-                  ) : (
-                    filteredPreviewCategories.map(category => (
-                      <div key={category.id} className="space-y-1.5">
-                        <div className="flex items-center justify-between border-b pb-0.5">
-                          <span className="font-bold text-xs text-gray-900">{category.name}</span>
-                          <span className="text-[9px] text-gray-400">{category.items.length} çeşit</span>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          {category.items.map(item => (
-                            <div 
-                              key={item.id}
-                              onClick={() => setPreviewSelectedItem(item)}
-                              className="p-2 bg-white rounded-xl border hover:shadow-2xs transition-shadow cursor-pointer flex gap-2"
-                            >
-                              {item.image_url ? (
-                                <img 
-                                  src={item.image_url} 
-                                  alt={item.name} 
-                                  className="w-14 h-14 rounded-lg object-cover bg-gray-100 shrink-0" 
-                                />
-                              ) : (
-                                <div className="w-14 h-14 rounded-lg bg-gray-100 border flex items-center justify-center text-gray-400 shrink-0">
-                                  <Utensils className="h-5 w-5" />
-                                </div>
-                              )}
-                              <div className="flex-1 flex flex-col justify-between min-w-0">
-                                <div>
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-bold text-xs text-gray-900 truncate">{item.name}</span>
-                                  </div>
-                                  <p className="text-[10px] text-gray-500 line-clamp-1">{item.description}</p>
-                                </div>
-                                <div className="flex items-center justify-between mt-1">
-                                  {item.price ? (
-                                    <span className="font-extrabold text-xs" style={{ color: primaryColor }}>
-                                      {item.price}
-                                    </span>
-                                  ) : <span />}
-                                  {item.calories && (
-                                    <span className="text-[9px] text-gray-400 flex items-center">
-                                      <Flame className="h-2.5 w-2.5 text-amber-500 mr-0.5" /> {item.calories} kcal
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div className="p-3 bg-white border-t text-center text-[10px] text-gray-400">
-                <span>{currentRestaurant?.name} • QR Chef</span>
-              </div>
-            </div>
-
-            {/* Ürün Detay Modalı */}
-            <AnimatePresence>
-              {previewSelectedItem && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 50 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 50 }}
-                  className="absolute inset-x-3.5 bottom-3.5 bg-white rounded-[32px] p-4 shadow-2xl border z-50 max-h-[85%] overflow-y-auto space-y-2.5 text-gray-900"
-                >
-                  {previewSelectedItem.image_url ? (
-                    <img 
-                      src={previewSelectedItem.image_url} 
-                      alt={previewSelectedItem.name} 
-                      className="w-full h-32 rounded-2xl object-cover" 
-                    />
-                  ) : null}
-                  <div className="flex justify-between items-start">
-                    <h3 className="font-bold text-sm">{previewSelectedItem.name}</h3>
-                    {previewSelectedItem.price && (
-                      <span className="font-extrabold text-sm" style={{ color: primaryColor }}>
-                        {previewSelectedItem.price}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-gray-600 leading-relaxed">{previewSelectedItem.description}</p>
-                  
-                  {previewSelectedItem.allergens && previewSelectedItem.allergens.length > 0 && (
-                    <div className="text-[10px] space-y-1">
-                      <span className="font-bold text-red-700 flex items-center">
-                        <AlertCircle className="h-3 w-3 mr-1 text-red-500" /> Alerjenler:
-                      </span>
-                      <div className="flex flex-wrap gap-1">
-                        {previewSelectedItem.allergens.map((a) => (
-                          <span key={a} className="bg-red-50 text-red-700 px-1.5 py-0.5 rounded border border-red-200">
-                            {a}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <Button 
-                    size="sm" 
-                    className="w-full text-xs h-7 mt-2 text-white" 
-                    style={{ backgroundColor: primaryColor }}
-                    onClick={() => setPreviewSelectedItem(null)}
-                  >
-                    Kapat
-                  </Button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <iframe
+              ref={previewIframeRef}
+              title="Canlı Müşteri Önizlemesi"
+              src={`/menu/${subdomain}?preview=1`}
+              className="w-full h-full bg-white rounded-[38px] border-0"
+            />
           </div>
         </div>
       </div>
@@ -1611,6 +1580,7 @@ export function LiveMenuEditor() {
               const err = await res.json()
               throw new Error(err.error || 'Bilinmeyen hata')
             }
+            await adoptServerIds(res, newMenu)
             setSavedSuccess(true)
             setTimeout(() => setSavedSuccess(false), 3000)
             toast.success('Taranan menü başarıyla kaydedildi.')

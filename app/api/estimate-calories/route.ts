@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limiter'
+import { checkRateLimit, getClientIp, getQuota, consumeQuota, RATE_LIMITS } from '@/lib/rate-limiter'
 import { sanitizeText } from '@/lib/sanitizer'
 import { logSecurityEvent } from '@/lib/security-logger'
 import { requireUser } from '@/lib/auth-middleware'
@@ -65,6 +65,22 @@ export async function POST(req: NextRequest) {
 
     const cleanItemName = sanitizeText(itemName.trim(), 150)
     const cleanCategory = categoryHint ? sanitizeText(categoryHint.trim(), 100) : ''
+
+    // Ürün başına kota: aynı kullanıcı + aynı ürün adı için en fazla 2 hesaplama
+    const itemKey = cleanItemName.toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ')
+    const quotaKey = `calorie_item_${auth.user.id}_${itemKey}`
+    const quota = getQuota(quotaKey, RATE_LIMITS.CALORIE_PER_ITEM.limit)
+    if (!quota.allowed) {
+      return NextResponse.json(
+        {
+          error: `"${cleanItemName}" için en fazla ${quota.limit} kez hesaplama yapabilirsiniz. Değeri elle düzenleyebilir veya başka bir ürün için hesaplayabilirsiniz.`,
+          code: 'ITEM_QUOTA_EXCEEDED',
+          used: quota.used,
+          limit: quota.limit,
+        },
+        { status: 429 }
+      )
+    }
     const cleanIngredients = ingredients ? sanitizeText(ingredients.trim(), 1000) : ''
 
     let promptText: string
@@ -171,9 +187,13 @@ Kurallar:
       )
     }
 
+    // Yalnızca başarılı hesaplamalar kotadan düşer
+    consumeQuota(quotaKey, RATE_LIMITS.CALORIE_PER_ITEM.windowSeconds)
+
     return NextResponse.json({
       success: true,
       calories,
+      remaining: Math.max(0, RATE_LIMITS.CALORIE_PER_ITEM.limit - (quota.used + 1)),
       confidence: parsedResult.confidence || 'medium',
       note: parsedResult.note || undefined
     })

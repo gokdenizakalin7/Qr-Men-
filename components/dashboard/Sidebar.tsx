@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { QrCode, Menu as MenuIcon, LayoutDashboard, Settings, X, LogOut, Store, Smartphone, ShieldCheck } from 'lucide-react'
+import { QrCode, Menu as MenuIcon, LayoutDashboard, Settings, X, LogOut, Store, Smartphone, ShieldCheck, ChefHat } from 'lucide-react'
 import { clearClientSession } from '@/lib/session'
 
 export function Sidebar({ 
@@ -23,10 +23,15 @@ export function Sidebar({
   const location = useLocation()
   const navigate = useNavigate()
 
-  const isActive = (path: string): boolean => {
-    if (path === '/dashboard') return location.pathname === '/dashboard' || location.pathname === '/dashboard/'
-    return location.pathname.startsWith(path)
-  }
+  const path = location.pathname.replace(/\/$/, '')
+
+  const navItems = [
+    { to: '/dashboard', label: 'Kontrol Paneli', icon: LayoutDashboard, active: path === '/dashboard' },
+    { to: '/dashboard/menu-editor', label: 'Canlı Menü Editörü', icon: Smartphone, active: path.startsWith('/dashboard/menu-editor'), featured: true },
+    { to: '/dashboard/menus', label: 'Menü Listesi', icon: MenuIcon, active: path.startsWith('/dashboard/menus') },
+    { to: '/dashboard/qr-codes', label: 'QR Kodlar & Masalar', icon: QrCode, active: path.startsWith('/dashboard/qr-codes') },
+    { to: '/dashboard/settings', label: 'Restoran Ayarları', icon: Settings, active: path.startsWith('/dashboard/settings') },
+  ]
 
   const handleLogout = () => {
     clearClientSession()
@@ -35,20 +40,24 @@ export function Sidebar({
 
   return (
     <motion.aside
-      className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg lg:relative border-r flex flex-col justify-between ${
-        isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-      }`}
+      className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col justify-between border-r border-border/60 bg-card/80 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-black/40 lg:relative lg:shadow-none"
       initial={false}
-      animate={{ 
-        x: isSidebarOpen ? 0 : '-100%'
-      }}
+      animate={{ x: isSidebarOpen ? 0 : '-100%' }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
     >
       <div>
-        <div className="flex h-16 items-center justify-between px-5 border-b">
-          <Link to="/dashboard" className="flex items-center space-x-2 font-bold text-xl text-primary">
-            <QrCode className="h-6 w-6 text-primary" />
-            <span>QR Chef</span>
+        <div className="flex h-20 items-center justify-between px-5">
+          <Link to="/dashboard" className="flex items-center gap-3">
+            <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-border/60 bg-primary/10 shadow-lg backdrop-blur-xl dark:border-white/20 dark:bg-white/10">
+              <QrCode className="h-6 w-6 text-foreground" />
+              <div className="absolute -right-2 -top-2 rounded-full border border-border/60 bg-card p-0.5 dark:border-white/10 dark:bg-black/60">
+                <ChefHat className="h-4 w-4 text-foreground" />
+              </div>
+            </div>
+            <div className="leading-tight">
+              <span className="block text-lg font-extrabold tracking-tight text-foreground">QR Chef</span>
+              <span className="block text-[11px] font-medium text-muted-foreground">Restoran Yönetim Paneli</span>
+            </div>
           </Link>
           <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(false)} className="lg:hidden">
             <X className="h-5 w-5" />
@@ -56,93 +65,61 @@ export function Sidebar({
           </Button>
         </div>
 
-        <nav className="p-3 space-y-1.5">
-          <Button 
-            variant={isActive('/dashboard') && !isActive('/dashboard/menu-editor') && !isActive('/dashboard/menus') && !isActive('/dashboard/qr-codes') && !isActive('/dashboard/settings') ? 'secondary' : 'ghost'} 
-            className="w-full justify-start font-medium" 
-            asChild
-          >
-            <Link to="/dashboard">
-              <LayoutDashboard className="mr-3 h-4 w-4" />
-              Kontrol Paneli
+        <nav className="space-y-1.5 p-4">
+          <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Menü</p>
+          {navItems.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              onClick={() => window.innerWidth < 1024 && setIsSidebarOpen(false)}
+              className={`group relative flex items-center rounded-2xl px-3.5 py-3 text-sm font-semibold transition-colors ${
+                item.active ? 'text-primary-foreground' : 'text-muted-foreground hover:bg-accent/70 hover:text-foreground'
+              }`}
+            >
+              {item.active && (
+                <motion.span
+                  layoutId="sidebar-active-pill"
+                  className="absolute inset-0 rounded-2xl bg-primary shadow-[0_6px_20px_rgba(15,23,42,0.25)] dark:shadow-[0_0_20px_rgba(255,255,255,0.25)]"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+              <item.icon className="relative z-10 mr-3 h-[18px] w-[18px]" />
+              <span className="relative z-10">{item.label}</span>
+              {item.featured && !item.active && (
+                <span className="relative z-10 ml-auto rounded-full border border-border bg-card/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-foreground">
+                  Canlı
+                </span>
+              )}
             </Link>
-          </Button>
-
-          {/* CANLI MENÜ EDİTÖRÜ (ÖNE ÇIKAN BUTON) */}
-          <Button 
-            variant={isActive('/dashboard/menu-editor') ? 'secondary' : 'ghost'} 
-            className="w-full justify-start font-bold text-primary bg-primary/5 hover:bg-primary/10 border border-primary/20" 
-            asChild
-          >
-            <Link to="/dashboard/menu-editor">
-              <Smartphone className="mr-3 h-4 w-4 text-primary" />
-              Canlı Menü Editörü
-            </Link>
-          </Button>
-
-          <Button 
-            variant={isActive('/dashboard/menus') ? 'secondary' : 'ghost'} 
-            className="w-full justify-start font-medium" 
-            asChild
-          >
-            <Link to="/dashboard/menus">
-              <MenuIcon className="mr-3 h-4 w-4" />
-              Menü Listesi
-            </Link>
-          </Button>
-
-          <Button 
-            variant={isActive('/dashboard/qr-codes') ? 'secondary' : 'ghost'} 
-            className="w-full justify-start font-medium" 
-            asChild
-          >
-            <Link to="/dashboard/qr-codes">
-              <QrCode className="mr-3 h-4 w-4" />
-              QR Kodlar & Masalar
-            </Link>
-          </Button>
-
-          <Button 
-            variant={isActive('/dashboard/settings') ? 'secondary' : 'ghost'} 
-            className="w-full justify-start font-medium" 
-            asChild
-          >
-            <Link to="/dashboard/settings">
-              <Settings className="mr-3 h-4 w-4" />
-              Restoran Ayarları
-            </Link>
-          </Button>
+          ))}
 
           {userRole === 'superadmin' && (
-            <div className="pt-2 border-t mt-2">
-              <Button 
-                variant="outline" 
-                className="w-full justify-start text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border-blue-200" 
-                asChild
+            <div className="mt-3 border-t border-border/60 pt-3">
+              <Link
+                to="/admin"
+                className="flex items-center rounded-2xl border border-border bg-card/50 px-3.5 py-3 text-xs font-bold text-foreground backdrop-blur-md transition-all hover:bg-accent"
               >
-                <Link to="/admin">
-                  <ShieldCheck className="mr-2 h-4 w-4" />
-                  Süper Admin Paneli
-                </Link>
-              </Button>
+                <ShieldCheck className="mr-3 h-4 w-4" />
+                Süper Admin Paneli
+              </Link>
             </div>
           )}
         </nav>
       </div>
 
-      <div className="p-3 border-t bg-gray-50">
+      <div className="p-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="w-full justify-start p-2 h-auto hover:bg-white">
-              <Avatar className="h-9 w-9 mr-3 border">
+            <Button variant="ghost" className="h-auto w-full justify-start rounded-2xl border border-border/60 bg-card/60 p-2.5 backdrop-blur-xl hover:bg-accent dark:border-white/10 dark:bg-white/5">
+              <Avatar className="mr-3 h-10 w-10 border-2 border-border">
                 <AvatarImage src="" alt={userInfo.name} />
-                <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                <AvatarFallback className="bg-primary/10 font-bold text-foreground">
                   {userInfo.name.slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex flex-col items-start truncate text-left">
-                <span className="text-sm font-semibold text-gray-900 leading-tight truncate">{userInfo.name}</span>
-                <span className="text-xs text-muted-foreground truncate">{userInfo.email}</span>
+                <span className="truncate text-sm font-semibold leading-tight text-foreground">{userInfo.name}</span>
+                <span className="truncate text-xs text-muted-foreground">{userInfo.email}</span>
               </div>
             </Button>
           </DropdownMenuTrigger>

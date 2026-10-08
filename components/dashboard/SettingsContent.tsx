@@ -11,7 +11,6 @@ import { Restaurant } from '@/lib/types'
 import { Check, Store, Wifi, Palette, KeyRound, Share2, Star, MessageSquare } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { sanitizeText, sanitizeMultilineText, sanitizeUrl } from '@/lib/sanitizer'
-import { authFetch } from '@/lib/api-client'
 
 export function SettingsContent() {
   const [activeTab, setActiveTab] = useState<'isletme' | 'sosyal' | 'wifi' | 'marka' | 'sifre'>('isletme')
@@ -128,8 +127,8 @@ export function SettingsContent() {
     >
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Restoran Ayarları</h1>
-          <p className="text-sm text-gray-500">İşletme detaylarınızı, sosyal medya ve Google yorum bağlantılarınızı düzenleyin</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Restoran Ayarları</h1>
+          <p className="text-sm text-muted-foreground">İşletme detaylarınızı, sosyal medya ve Google yorum bağlantılarınızı düzenleyin</p>
         </div>
         {saveMessage && (
           <span className="text-sm bg-green-100 text-green-800 px-3 py-1.5 rounded-full font-medium flex items-center">
@@ -154,7 +153,7 @@ export function SettingsContent() {
               className={`flex items-center space-x-2 py-2 px-3 text-sm rounded-lg transition-colors whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'bg-primary text-white font-semibold'
-                  : 'text-gray-600 hover:bg-gray-100'
+                  : 'text-muted-foreground hover:bg-accent'
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -234,7 +233,7 @@ export function SettingsContent() {
               <div className="space-y-1">
                 <Label className="font-semibold">Instagram Kullanıcı Adı</Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-gray-400 font-bold">@</span>
+                  <span className="absolute left-3 top-2.5 text-muted-foreground font-bold">@</span>
                   <Input 
                     placeholder="lezzetocakbasi_ist"
                     className="pl-7"
@@ -242,7 +241,7 @@ export function SettingsContent() {
                     onChange={(e) => setBusinessInfo(b => ({ ...b, instagramHandle: e.target.value.replace('@', '') }))}
                   />
                 </div>
-                <p className="text-[11px] text-gray-400">Menü başlığında Instagram butonu olarak görünür.</p>
+                <p className="text-[11px] text-muted-foreground">Menü başlığında Instagram butonu olarak görünür.</p>
               </div>
 
               <div className="space-y-1">
@@ -252,7 +251,7 @@ export function SettingsContent() {
                   value={businessInfo.whatsappNumber} 
                   onChange={(e) => setBusinessInfo(b => ({ ...b, whatsappNumber: e.target.value }))}
                 />
-                <p className="text-[11px] text-gray-400">Müşterinin doğrudan WhatsApp sohbeti başlatmasını sağlar.</p>
+                <p className="text-[11px] text-muted-foreground">Müşterinin doğrudan WhatsApp sohbeti başlatmasını sağlar.</p>
               </div>
             </div>
 
@@ -263,7 +262,7 @@ export function SettingsContent() {
                 value={businessInfo.googleMapsUrl} 
                 onChange={(e) => setBusinessInfo(b => ({ ...b, googleMapsUrl: e.target.value }))}
               />
-              <p className="text-[11px] text-gray-400">Müşteriler tek tıkla navigasyon başlatabilir.</p>
+              <p className="text-[11px] text-muted-foreground">Müşteriler tek tıkla navigasyon başlatabilir.</p>
             </div>
 
             <div className="space-y-1">
@@ -276,7 +275,7 @@ export function SettingsContent() {
                 value={businessInfo.googleReviewUrl} 
                 onChange={(e) => setBusinessInfo(b => ({ ...b, googleReviewUrl: e.target.value }))}
               />
-              <p className="text-[11px] text-gray-500">
+              <p className="text-[11px] text-muted-foreground">
                 Menüde memnuniyet puanı 4 veya 5 veren müşteriler doğrudan bu bağlantıya yönlendirilerek Google puanınız artırılır!
               </p>
             </div>

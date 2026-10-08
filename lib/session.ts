@@ -10,6 +10,7 @@ export function syncClientSessionCookies() {
 export function setClientSession(params: { role: string; restaurant?: any; userId?: string }) {
   if (typeof window === 'undefined') return
 
+  window.dispatchEvent(new Event('api-cache-clear'))
   localStorage.setItem('user_role', params.role)
 
   if (params.restaurant) {
@@ -24,6 +25,7 @@ export function setClientSession(params: { role: string; restaurant?: any; userI
 export function clearClientSession() {
   if (typeof window === 'undefined') return
 
+  window.dispatchEvent(new Event('api-cache-clear'))
   localStorage.removeItem('user_role')
   localStorage.removeItem('is_admin')
   localStorage.removeItem('is_admin_impersonating')

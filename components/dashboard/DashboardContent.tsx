@@ -9,16 +9,13 @@ import {
   QrCode, 
   Plus,
   ArrowRight,
-  Sparkles,
   Settings
 } from 'lucide-react'
 import { Restaurant } from '@/lib/types'
-import { CreateMenuModal } from '@/components/modals/CreateMenuModal'
 import { safeJsonParse } from '@/lib/utils'
 import { useNavigate } from 'react-router-dom'
 
 export function DashboardContent() {
-  const [isCreateMenuModalOpen, setIsCreateMenuModalOpen] = useState(false)
   const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant | null>(null)
   const navigate = useNavigate()
 
@@ -41,44 +38,46 @@ export function DashboardContent() {
       className="space-y-8 max-w-5xl mx-auto py-4"
     >
       {/* Hoşgeldin Başlığı */}
-      <div className="flex flex-col items-center justify-center text-center space-y-4 py-12 px-4 bg-white rounded-3xl border shadow-sm relative overflow-hidden">
+      <div className="flex flex-col items-center justify-center text-center space-y-4 py-14 px-4 glass-card !rounded-[32px] relative overflow-hidden">
         {/* Dekoratif Arka Plan Öğeleri */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary/20 via-primary to-primary/20" />
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
         <div className="absolute -left-16 -top-16 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -right-16 -bottom-16 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="w-20 h-20 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-2 z-10 shadow-sm border border-primary/20">
-          <Sparkles className="w-10 h-10" />
+        <div data-reveal className="w-24 h-24 bg-primary/10 text-foreground rounded-[28px] flex items-center justify-center mb-2 z-10 shadow-2xl border border-border/60 backdrop-blur-xl dark:border-white/20 dark:bg-white/10">
+          <img src="/logo.jpg" alt="Logo" className="w-full h-full object-contain rounded-[28px]" />
         </div>
-        <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight z-10">
+        <h1 data-reveal className="text-4xl md:text-5xl font-extrabold text-foreground tracking-tight z-10">
           Hoş Geldiniz, {currentRestaurant?.name || 'Değerli İşletmeci'}!
         </h1>
-        <p className="text-gray-500 max-w-xl text-lg z-10 leading-relaxed">
+        <p data-reveal className="text-muted-foreground max-w-xl text-lg z-10 leading-relaxed">
           QR Chef ile restoranınızın dijital menüsünü saniyeler içinde oluşturabilir, masalarınıza özel QR kodları basabilirsiniz.
         </p>
-        <div className="pt-6 z-10">
-          <Button size="lg" className="px-8 shadow-lg font-bold text-md h-12 rounded-xl" onClick={() => setIsCreateMenuModalOpen(true)}>
+        <div data-reveal className="pt-6 z-10">
+          <Button size="lg" className="px-8 font-bold text-md h-12 rounded-2xl" onClick={() => navigate('menus')}>
             <Plus className="mr-2 h-5 w-5" /> Hemen Yeni Menü Ekle
           </Button>
         </div>
       </div>
 
       {/* Hızlı Erişim Kartları */}
-      <div className="grid gap-6 md:grid-cols-3">
+      <div data-reveal-group className="grid gap-6 md:grid-cols-3">
         {/* Menü Listesi */}
         <Card 
-          className="hover:shadow-md transition-all cursor-pointer border-2 border-transparent hover:border-blue-100 group" 
+          data-reveal
+          className="relative overflow-hidden hover:-translate-y-1 hover:shadow-2xl transition-all duration-300 cursor-pointer group" 
           onClick={() => navigate('menus')}
         >
+          <span aria-hidden className="absolute inset-x-0 top-0 z-10 h-0.5 origin-left scale-x-0 bg-primary transition-transform duration-300 group-hover:scale-x-100" />
           <CardHeader className="pb-4">
-            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <div className="w-12 h-12 bg-primary/10 text-foreground border border-border/60 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300 ease-out">
               <MenuIcon className="w-6 h-6" />
             </div>
             <CardTitle className="text-xl">Menü Listesi</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-500 mb-6 leading-relaxed">Mevcut menülerinizi düzenleyin, kategorileri yönetin ve yayına alın.</p>
-            <div className="text-sm font-bold text-blue-600 flex items-center">
+            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">Mevcut menülerinizi düzenleyin, kategorileri yönetin ve yayına alın.</p>
+            <div className="text-sm font-bold text-foreground flex items-center">
               Menüleri Yönet <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
             </div>
           </CardContent>
@@ -86,18 +85,20 @@ export function DashboardContent() {
 
         {/* QR Kodlar */}
         <Card 
-          className="hover:shadow-md transition-all cursor-pointer border-2 border-transparent hover:border-green-100 group" 
+          data-reveal
+          className="relative overflow-hidden hover:-translate-y-1 hover:shadow-2xl transition-all duration-300 cursor-pointer group" 
           onClick={() => navigate('qr-codes')}
         >
+          <span aria-hidden className="absolute inset-x-0 top-0 z-10 h-0.5 origin-left scale-x-0 bg-primary transition-transform duration-300 group-hover:scale-x-100" />
           <CardHeader className="pb-4">
-            <div className="w-12 h-12 bg-green-50 text-green-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <div className="w-12 h-12 bg-primary/10 text-foreground border border-border/60 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300 ease-out">
               <QrCode className="w-6 h-6" />
             </div>
             <CardTitle className="text-xl">Masa QR Kodları</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-500 mb-6 leading-relaxed">Masalarınıza özel QR kodlar oluşturun ve PDF olarak çıktı alın.</p>
-            <div className="text-sm font-bold text-green-600 flex items-center">
+            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">Masalarınıza özel QR kodlar oluşturun ve PDF olarak çıktı alın.</p>
+            <div className="text-sm font-bold text-foreground flex items-center">
               QR Kodları Çıkar <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
             </div>
           </CardContent>
@@ -105,28 +106,25 @@ export function DashboardContent() {
 
         {/* Ayarlar */}
         <Card 
-          className="hover:shadow-md transition-all cursor-pointer border-2 border-transparent hover:border-purple-100 group" 
+          data-reveal
+          className="relative overflow-hidden hover:-translate-y-1 hover:shadow-2xl transition-all duration-300 cursor-pointer group" 
           onClick={() => navigate('settings')}
         >
+          <span aria-hidden className="absolute inset-x-0 top-0 z-10 h-0.5 origin-left scale-x-0 bg-primary transition-transform duration-300 group-hover:scale-x-100" />
           <CardHeader className="pb-4">
-            <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <div className="w-12 h-12 bg-primary/10 text-foreground border border-border/60 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300 ease-out">
               <Settings className="w-6 h-6" />
             </div>
             <CardTitle className="text-xl">Restoran Ayarları</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-500 mb-6 leading-relaxed">Marka renklerinizi, logonuzu ve restoran detaylarınızı güncelleyin.</p>
-            <div className="text-sm font-bold text-purple-600 flex items-center">
+            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">Marka renklerinizi, logonuzu ve restoran detaylarınızı güncelleyin.</p>
+            <div className="text-sm font-bold text-foreground flex items-center">
               Ayarlara Git <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
             </div>
           </CardContent>
         </Card>
       </div>
-
-      <CreateMenuModal 
-        isOpen={isCreateMenuModalOpen} 
-        onClose={() => setIsCreateMenuModalOpen(false)} 
-      />
     </motion.div>
   )
 }

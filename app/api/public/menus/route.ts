@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function GET(request: Request) {
   try {
@@ -11,14 +11,14 @@ export async function GET(request: Request) {
     }
 
     // Yalnızca yayında olan (is_listed = true) menüleri ve aktif kategorileri/ürünleri getirir
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('menus')
       .select(`
         id, name, description, image_url, layout,
         categories (
-          id, name, description, display_order,
+          id, name, description, display_order, is_active,
           items (
-            id, name, description, price, image_url, allergens, calories, is_available, display_order, tags
+            id, name, description, price, image_url, allergens, calories, is_available, is_featured, display_order, tags
           )
         )
       `)

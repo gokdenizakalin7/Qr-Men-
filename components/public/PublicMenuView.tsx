@@ -33,6 +33,7 @@ import {
 import { PublicTermsOfServiceModal } from '@/components/modals/PublicTermsOfServiceModal'
 import { PublicPrivacyPolicyModal } from '@/components/modals/PublicPrivacyPolicyModal'
 import { motion, AnimatePresence } from 'framer-motion'
+import type { Menu, MenuItem, ProductTag } from '@/lib/types'
 
 // ÇOKLU DİL SÖZLÜĞÜ (TR, EN, AR, RU)
 const TRANSLATIONS = {
@@ -136,6 +137,10 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
   const searchParams = new URLSearchParams(location.search)
   const tableName = searchParams.get('table') || searchParams.get('masa')
 
+  const isPreview = searchParams.get('preview') === '1'
+  const [previewMenu, setPreviewMenu] = useState<Menu | null>(null)
+  const [previewPrimary, setPreviewPrimary] = useState<string | null>(null)
+
   const targetSubdomain = restaurantSubdomain || paramSubdomain || 'lezzet-ocakbasi'
 
   const [restaurant, setRestaurant] = useState<any>(null)
@@ -193,7 +198,26 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
   const [menus, setMenus] = useState<Menu[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
+  // Panel içi canlı önizleme: yayınlanmamış düzenlemeler üst pencereden gelir
   useEffect(() => {
+    if (!isPreview) return
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin || e.data?.type !== 'qr-preview-data') return
+      setPreviewMenu(e.data.menu || null)
+      setPreviewPrimary(e.data.primaryColor || null)
+      if (e.data.restaurant) {
+        setRestaurant(e.data.restaurant)
+        setRestaurantError(false)
+        setIsLoadingRestaurant(false)
+      }
+    }
+    window.addEventListener('message', onMessage)
+    window.parent?.postMessage({ type: 'qr-preview-ready' }, window.location.origin)
+    return () => window.removeEventListener('message', onMessage)
+  }, [isPreview])
+
+  useEffect(() => {
+    if (isPreview) return // Önizlemede restoran bilgisi editörden gelir
     async function loadRestaurant() {
       try {
         const res = await fetch(`/api/public/restaurant?subdomain=${targetSubdomain}`)
@@ -210,11 +234,12 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
       }
     }
     loadRestaurant()
-  }, [targetSubdomain])
+  }, [targetSubdomain, isPreview])
 
   useEffect(() => {
     async function loadMenus() {
       if (!restaurant) return;
+      if (isPreview) { setIsLoading(false); return }
       try {
         const res = await fetch(`/api/public/menus?orgId=${restaurant.id}`)
         if (res.ok) {
@@ -234,11 +259,15 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
     } else if (restaurantError) {
       setIsLoading(false)
     }
-  }, [restaurant, restaurantError])
+  }, [restaurant, restaurantError, isPreview])
 
-  const activeMenu = menus[0]
+  const activeMenu = isPreview ? (previewMenu || undefined) : menus[0]
 
-  const primaryColor = restaurant.branding?.primaryColor || '#e11d48'
+  const primaryColor =
+    (isPreview && previewPrimary) ||
+    restaurant?.branding?.primaryColor ||
+    restaurant?.primary_color ||
+    '#e11d48'
 
   // SADECE AKTİF OLAN KATEGORİLER
   const activeCategories = (activeMenu?.categories || []).filter(c => c.is_active)

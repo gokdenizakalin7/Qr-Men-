@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function GET(request: Request) {
   try {
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     }
 
     // Yalnızca güvenli alanları seçiyoruz.
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('organizations')
       .select('id, name, logo_url, cover_url, primary_color, currency, address, city, business_phone, wifi_name, wifi_password')
       .eq('subdomain', subdomain)

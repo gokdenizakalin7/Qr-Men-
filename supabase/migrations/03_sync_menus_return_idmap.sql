@@ -1,7 +1,4 @@
--- Migration: 02_menu_sync_rpc.sql
--- Purpose: Safely sync menus, categories, and items in a single transaction.
--- This function handles upserting menus, deleting old categories, and inserting new categories/items atomically.
-
+-- sync_menus_transaction: geçici menu-* kimliklerini gerçek UUID ile eşle (idMap)
 CREATE OR REPLACE FUNCTION sync_menus_transaction(p_org_id UUID, p_menus JSONB)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -18,14 +15,12 @@ DECLARE
     v_id_map JSONB := '{}'::jsonb;
     v_client_id TEXT;
 BEGIN
-    -- Iterate over each menu
     FOR v_menu IN SELECT * FROM jsonb_array_elements(p_menus)
     LOOP
         v_client_id := v_menu->>'id';
         v_is_new := v_client_id LIKE 'menu-%';
 
         IF v_is_new THEN
-            -- Insert new menu
             INSERT INTO menus (organization_id, name, description, image_url, is_listed, layout)
             VALUES (
                 p_org_id,
@@ -36,10 +31,9 @@ BEGIN
                 COALESCE(v_menu->>'layout', 'grid')
             ) RETURNING id INTO v_menu_id;
         ELSE
-            -- Update existing menu
             v_menu_id := v_client_id::UUID;
             UPDATE menus
-            SET 
+            SET
                 name = COALESCE(v_menu->>'name', 'Menü'),
                 description = COALESCE(v_menu->>'description', ''),
                 image_url = COALESCE(v_menu->>'image_url', ''),
@@ -52,10 +46,8 @@ BEGIN
             v_id_map := v_id_map || jsonb_build_object(v_client_id, v_menu_id::text);
         END IF;
 
-        -- Delete old categories for this menu
         DELETE FROM categories WHERE menu_id = v_menu_id;
 
-        -- Insert new categories and items
         FOR v_cat IN SELECT * FROM jsonb_array_elements(COALESCE(v_menu->'categories', '[]'::jsonb))
         LOOP
             INSERT INTO categories (menu_id, name, description, display_order, is_active)
@@ -72,7 +64,7 @@ BEGIN
                 FOR v_item IN SELECT * FROM jsonb_array_elements(v_items_array)
                 LOOP
                     INSERT INTO items (
-                        category_id, name, description, price, image_url, 
+                        category_id, name, description, price, image_url,
                         is_available, is_featured, display_order
                     ) VALUES (
                         v_cat_id,

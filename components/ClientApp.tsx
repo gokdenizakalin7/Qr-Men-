@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import { AnimatePresence } from 'framer-motion'
+import React, { useState, useEffect, useRef } from 'react'
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { PageTransition, useSmoothScroll, useRevealOnScroll } from '@/components/dashboard/ScrollNavigation'
 
 import { LandingPage } from '@/components/landing/LandingPage'
 import { BusinessDirectory } from '@/components/landing/BusinessDirectory'
@@ -12,6 +12,7 @@ import { AdminDashboard } from '@/components/admin/AdminDashboard'
 import { AdminGuard, AuthGuard } from '@/components/auth/RouteGuards'
 
 import { Sidebar } from '@/components/dashboard/Sidebar'
+import { PanelThemeProvider, PanelBackground } from '@/components/theme/PanelTheme'
 import { Header } from '@/components/dashboard/Header'
 import { DashboardContent } from '@/components/dashboard/DashboardContent'
 import { LiveMenuEditor } from '@/components/dashboard/LiveMenuEditor'
@@ -23,24 +24,23 @@ import { PublicMenuView } from '@/components/public/PublicMenuView'
 import { MOCK_RESTAURANTS } from '@/lib/mock-data'
 import { Restaurant } from '@/lib/types'
 import { safeJsonParse } from '@/lib/utils'
+import { authFetch } from '@/lib/api-client'
 
 function DashboardLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const location = useLocation()
+  const mainRef = useRef<HTMLElement>(null)
+  useSmoothScroll(mainRef)
+  useRevealOnScroll(mainRef)
   const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant | null>(null)
   const [userRole, setUserRole] = useState<string>('restaurant')
 
   useEffect(() => {
     async function loadSession() {
       try {
-        const token = localStorage.getItem('sb-access-token') || '' // Try to get token if stored, or authFetch will handle it
-        
-        // Alternatively, use our /api/auth/me endpoint which checks cookies/headers
-        const res = await fetch('/api/auth/me', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
-        
+        // AuthGuard ile aynı isteği paylaşır (önbellek + tekilleştirme)
+        const res = await authFetch('/api/auth/me')
+
         if (res.ok) {
           const data = await res.json()
           setUserRole(data.role)
@@ -91,7 +91,9 @@ function DashboardLayout() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-100">
+    <PanelThemeProvider>
+    <div className="relative flex h-screen overflow-hidden bg-background text-foreground">
+      <PanelBackground />
       <Sidebar 
         isSidebarOpen={isSidebarOpen} 
         setIsSidebarOpen={setIsSidebarOpen} 
@@ -99,16 +101,16 @@ function DashboardLayout() {
         userRole={userRole}
       />
 
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
         <Header 
           setIsSidebarOpen={setIsSidebarOpen} 
           restaurantName={currentRestaurant?.name}
           subdomain={currentRestaurant?.subdomain}
         />
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-          <AnimatePresence mode="wait">
-            <Routes>
+        <main ref={mainRef} className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6">
+          <PageTransition mainRef={mainRef}>
+            <Routes location={location}>
               <Route index element={<DashboardContent />} />
               <Route path="" element={<DashboardContent />} />
               <Route path="/" element={<DashboardContent />} />
@@ -126,10 +128,11 @@ function DashboardLayout() {
               <Route path="/settings" element={<SettingsContent />} />
               <Route path="*" element={<DashboardContent />} />
             </Routes>
-          </AnimatePresence>
+          </PageTransition>
         </main>
       </div>
     </div>
+    </PanelThemeProvider>
   )
 }
 

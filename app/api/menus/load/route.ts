@@ -4,77 +4,53 @@ import { requireAuth } from '@/lib/auth-middleware'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 export async function GET(request: NextRequest) {
   try {
-    const authCheck = await requireAuth(request)
-    if ('response' in authCheck) return authCheck.response
-
     const { searchParams } = new URL(request.url)
     const subdomain = searchParams.get('subdomain')
+
+    // Kimlik doğrulama ve organizasyon sorgusu birbirinden bağımsız: paralel çalıştır
+    const [authCheck, orgResult] = await Promise.all([
+      requireAuth(request),
+      subdomain
+        ? supabase.from('organizations').select('id').eq('subdomain', subdomain).single()
+        : Promise.resolve(null),
+    ])
+    if ('response' in authCheck) return authCheck.response
 
     if (!subdomain) {
       return NextResponse.json({ error: 'Missing subdomain' }, { status: 400 })
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    const { data: orgData, error: orgError } = await supabase
-      .from('organizations')
-      .select('id')
-      .eq('subdomain', subdomain)
-      .single()
-
-    if (orgError || !orgData) {
+    const orgData = orgResult?.data
+    if (orgResult?.error || !orgData) {
       return NextResponse.json({ menus: [] }) // return empty, will use default template
     }
 
+    // Menü + kategori + ürünler tek sorguda (eskiden 3 ardışık sorguydu)
     const { data: menusData, error: menusError } = await supabase
       .from('menus')
-      .select('id, name, description, image_url, is_listed, layout, created_at, updated_at')
+      .select(
+        'id, name, description, image_url, is_listed, layout, created_at, updated_at, categories(*, items(*))'
+      )
       .eq('organization_id', orgData.id)
       .order('created_at', { ascending: true })
+      .order('display_order', { ascending: true, referencedTable: 'categories' })
+      .order('display_order', { ascending: true, referencedTable: 'categories.items' })
 
     if (menusError || !menusData || menusData.length === 0) {
       return NextResponse.json({ menus: [] })
     }
 
-    const menuIds = menusData.map(m => m.id)
-
-    // Fetch all categories for these menus
-    const { data: categoriesData } = await supabase
-      .from('categories')
-      .select('*')
-      .in('menu_id', menuIds)
-      .order('display_order', { ascending: true })
-
-    let allItems: any[] = []
-    if (categoriesData && categoriesData.length > 0) {
-      const categoryIds = categoriesData.map(c => c.id)
-      const { data: itemsData } = await supabase
-        .from('items')
-        .select('*')
-        .in('category_id', categoryIds)
-        .order('display_order', { ascending: true })
-      
-      if (itemsData) {
-        allItems = itemsData
-      }
-    }
-
-    const menusWithDetails = menusData.map(menu => {
-      const menuCategories = (categoriesData || []).filter(c => c.menu_id === menu.id)
-      
-      const categoriesWithItems = menuCategories.map(cat => ({
+    const menusWithDetails = menusData.map((menu: any) => ({
+      ...menu,
+      categories: (menu.categories || []).map((cat: any) => ({
         ...cat,
-        items: allItems.filter(i => i.category_id === cat.id)
-      }))
-
-      return {
-        ...menu,
-        categories: categoriesWithItems
-      }
-    })
+        items: cat.items || [],
+      })),
+    }))
 
     return NextResponse.json({ menus: menusWithDetails })
   } catch (err: any) {

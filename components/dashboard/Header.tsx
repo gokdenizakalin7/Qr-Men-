@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Menu as MenuIcon, Settings, LogOut, ExternalLink, QrCode } from 'lucide-react'
 import { clearClientSession } from '@/lib/session'
+import { ThemeToggle } from '@/components/theme/PanelTheme'
 
 export function Header({ 
   setIsSidebarOpen, 
@@ -25,23 +26,19 @@ export function Header({
   }
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-white px-4 lg:px-6">
+    <header className="flex h-16 items-center justify-between border-b border-border/60 bg-card/60 px-4 backdrop-blur-xl dark:border-white/10 dark:bg-black/30 lg:px-6">
       <div className="flex items-center space-x-3">
         <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)} className="lg:hidden">
           <MenuIcon className="h-6 w-6" />
           <span className="sr-only">Menüyü Aç</span>
         </Button>
         <div className="flex items-center space-x-2">
-          <span className="font-bold text-gray-900 text-lg">{restaurantName || 'Restoran Paneli'}</span>
-          {subdomain && (
-            <span className="hidden sm:inline-flex text-xs bg-primary/10 text-primary px-2.5 py-0.5 rounded-full font-mono">
-              {subdomain}.qolay.com
-            </span>
-          )}
+          <span className="font-extrabold tracking-tight text-foreground text-lg">{restaurantName || 'Restoran Paneli'}</span>
         </div>
       </div>
 
       <div className="flex items-center space-x-3">
+        <ThemeToggle />
         <Button 
           variant="outline" 
           size="sm" 
@@ -66,7 +63,7 @@ export function Header({
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-semibold leading-none">{restaurantName || 'Yönetici'}</p>
-                <p className="text-xs leading-none text-muted-foreground">{subdomain ? `${subdomain}.qolay.com` : 'Panel Kullanıcısı'}</p>
+                <p className="text-xs leading-none text-muted-foreground">Panel Kullanıcısı</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

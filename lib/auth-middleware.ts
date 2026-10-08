@@ -2,10 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from './supabase-admin'
 import { logSecurityEvent } from './security-logger'
 import { getClientIp } from './rate-limiter'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 /**
  * Sunucu taraflı kimlik doğrulama ve çoklu kiracı (IDOR) yetkilendirme modülü.
@@ -30,51 +26,108 @@ function deny(status: number, error: string, code: string): Denied {
   return { response: NextResponse.json({ error, code }, { status }) }
 }
 
-export async function verifySession(req: NextRequest): Promise<SessionUser | null> {
-  const authHeader = req.headers.get('authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+/**
+ * Bearer token'ı Supabase ile doğrular. Geçersizse null döner.
+ */
+// Doğrulanmış token'lar için kısa ömürlü bellek önbelleği: her API çağrısında
+// Supabase'e ağ gidiş-dönüşü yapmayı önler (sayfa geçişlerindeki gecikmenin ana nedeni).
+const TOKEN_CACHE_TTL_MS = 30_000
+const TOKEN_CACHE_MAX = 500
+const tokenCache = new Map<string, { user: AuthUser; expires: number }>()
+
+async function getAuthUser(req: NextRequest | Request): Promise<AuthUser | null> {
+  const header = req.headers.get('authorization')
+  if (!header || !header.startsWith('Bearer ')) return null
+
+  const token = header.slice(7).trim()
+  if (!token) return null
+
+  const now = Date.now()
+  const cached = tokenCache.get(token)
+  if (cached && cached.expires > now) return cached.user
+
+  const { data, error } = await supabaseAdmin.auth.getUser(token)
+  if (error || !data?.user) {
+    tokenCache.delete(token)
     return null
   }
 
-  const token = authHeader.slice(7).trim()
-  const supabase = createClient(supabaseUrl, supabaseAnonKey)
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-
-  if (error || !user) {
-    return null
+  const email = (data.user.email || '').toLowerCase()
+  const user: AuthUser = {
+    id: data.user.id,
+    email,
+    isSuperAdmin: email === SUPER_ADMIN_EMAIL,
   }
 
-  // user_metadata or app_metadata contains the role and organization info
-  const role = (user.app_metadata?.role || user.user_metadata?.role || 'restaurant') as 'superadmin' | 'admin' | 'restaurant'
-  const restaurantId = user.user_metadata?.organization_id
-
-  return {
-    id: user.id,
-    role,
-    restaurantId
+  if (tokenCache.size >= TOKEN_CACHE_MAX) {
+    for (const [k, v] of tokenCache) {
+      if (v.expires <= now) tokenCache.delete(k)
+    }
+    if (tokenCache.size >= TOKEN_CACHE_MAX) tokenCache.clear()
   }
+  tokenCache.set(token, { user, expires: now + TOKEN_CACHE_TTL_MS })
+  return user
 }
 
 /**
  * Geçerli bir oturum zorunlu kılar. Yoksa 401 döner.
  */
-export async function requireAuth(req: NextRequest): Promise<{ user: SessionUser } | { response: NextResponse }> {
-  const user = await verifySession(req)
+export async function requireUser(
+  req: NextRequest | Request
+): Promise<{ user: AuthUser } | Denied> {
+  const user = await getAuthUser(req)
   if (!user) {
     logSecurityEvent({
       type: 'UNAUTHORIZED_ACCESS_ATTEMPT',
-      ip: getClientIp(req),
-      endpoint: req.nextUrl.pathname,
-      details: { reason: 'Oturum bulunamadı veya geçersiz' }
+      ip: getClientIp(req as NextRequest),
+      endpoint: new URL(req.url).pathname,
+      details: { reason: 'Geçersiz veya eksik oturum' },
     })
     return deny(401, 'Bu işlem için giriş yapmanız gerekmektedir.', 'UNAUTHORIZED')
   }
   return { user }
 }
 
-export async function requireAdmin(req: NextRequest): Promise<{ user: SessionUser } | { response: NextResponse }> {
-  const authCheck = await requireAuth(req)
-  if ('response' in authCheck) return authCheck
+/** Oturum zorunlu (requireUser ile aynı; panel yükleme uçları için). */
+export async function requireAuth(
+  req: NextRequest | Request
+): Promise<{ user: AuthUser } | Denied> {
+  return requireUser(req)
+}
+
+/**
+ * Süper admin e-postası ile giriş zorunlu kılar.
+ */
+export async function requireSuperAdmin(
+  req: NextRequest | Request
+): Promise<{ user: AuthUser } | Denied> {
+  const auth = await requireUser(req)
+  if ('response' in auth) return auth
+
+  if (!auth.user.isSuperAdmin) {
+    logSecurityEvent({
+      type: 'UNAUTHORIZED_ACCESS_ATTEMPT',
+      ip: getClientIp(req as NextRequest),
+      userId: auth.user.id,
+      endpoint: new URL(req.url).pathname,
+      details: { reason: 'Süper Admin yetkisi eksik' },
+    })
+    return deny(403, 'Bu işlem yalnızca Süper Adminlere açıktır.', 'FORBIDDEN')
+  }
+
+  return auth
+}
+
+/**
+ * Kullanıcının verilen organizasyonun üyesi (veya süper admin) olmasını zorunlu kılar.
+ */
+export async function requireOrgAccess(
+  req: NextRequest | Request,
+  organizationId: string
+): Promise<{ user: AuthUser; organizationId: string } | Denied> {
+  const auth = await requireUser(req)
+  if ('response' in auth) return auth
+  const { user } = auth
 
   if (user.isSuperAdmin) return { user, organizationId }
 
@@ -85,55 +138,7 @@ export async function requireAdmin(req: NextRequest): Promise<{ user: SessionUse
     .eq('organization_id', organizationId)
     .maybeSingle()
 
-  return { user }
-}
-
-export async function requireSuperAdmin(req: NextRequest): Promise<{ user: SessionUser } | { response: NextResponse }> {
-  const authCheck = await requireAuth(req)
-  if ('response' in authCheck) return authCheck
-
-  const user = authCheck.user
-  if (user.role !== 'superadmin') {
-    logSecurityEvent({
-      type: 'UNAUTHORIZED_ACCESS_ATTEMPT',
-      ip: getClientIp(req),
-      userId: user.id,
-      role: user.role,
-      endpoint: req.nextUrl.pathname,
-      details: { reason: 'Süper Admin yetkisi eksik' }
-    })
-
-    return {
-      response: NextResponse.json(
-        { error: 'Bu işlem yalnızca Süper Adminlere açıktır.', code: 'FORBIDDEN' },
-        { status: 403 }
-      )
-    }
-  }
-
-  return { user }
-}
-
-/**
- * IDOR Koruması: Restoran kullanıcısının yalnızca kendi restoranına ait verilere erişmesini sağlar.
- * Süper Admin kullanıcılar tüm restoranlara erişebilir.
- */
-export async function requireOwnership(
-  req: NextRequest,
-  targetRestaurantId: string
-): Promise<{ user: SessionUser } | { response: NextResponse }> {
-  const authCheck = await requireAuth(req)
-  if ('response' in authCheck) return authCheck
-
-  const user = authCheck.user
-
-  // SuperAdmin her restorana erişebilir
-  if (user.role === 'superadmin' || user.role === 'admin') {
-    return { user }
-  }
-
-  // Restoran kullanıcısı yalnızca kendi restoranına erişebilir
-  if (user.restaurantId && user.restaurantId !== targetRestaurantId) {
+  if (!data) {
     logSecurityEvent({
       type: 'IDOR_ACCESS_ATTEMPT',
       ip: getClientIp(req as NextRequest),

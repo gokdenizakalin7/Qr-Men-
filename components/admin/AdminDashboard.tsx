@@ -39,11 +39,29 @@ import {
 } from 'lucide-react'
 import { Restaurant, UserRole, UserAccount, Menu, AccountStatus } from '@/lib/types'
 import { MOCK_RESTAURANTS, mockMenusByRestaurant, SYSTEM_USERS } from '@/lib/mock-data'
-import { motion } from 'framer-motion'
+import { motion, animate } from 'framer-motion'
+import { PanelThemeProvider, PanelBackground, ThemeToggle } from '@/components/theme/PanelTheme'
 import { clearClientSession } from '@/lib/session'
 import { authFetch } from '@/lib/api-client'
 
+function CountUp({ value }: { value: number }) {
+  const [display, setDisplay] = useState(0)
+  useEffect(() => {
+    const controls = animate(0, value, { duration: 1, ease: 'easeOut', onUpdate: (v) => setDisplay(Math.round(v)) })
+    return () => controls.stop()
+  }, [value])
+  return <>{display.toLocaleString()}</>
+}
+
 export function AdminDashboard() {
+  return (
+    <PanelThemeProvider>
+      <AdminDashboardInner />
+    </PanelThemeProvider>
+  )
+}
+
+function AdminDashboardInner() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<'kullanicilar' | 'menuler' | 'analitik' | 'ayarlar'>('kullanicilar')
 
@@ -229,141 +247,124 @@ export function AdminDashboard() {
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-gray-100 flex flex-col justify-between"
+      className="relative min-h-screen bg-background text-foreground flex flex-col justify-between"
     >
-      <div>
+      <PanelBackground />
+      <div className="relative z-10">
         {/* Admin Üst Bar */}
-        <header className="bg-white border-b px-6 py-3 flex items-center justify-between sticky top-0 z-50 shadow-xs">
+        <header className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-border/60 bg-card/60 px-4 py-3 backdrop-blur-2xl dark:border-white/10 dark:bg-black/30 sm:px-6">
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-primary/10 text-primary rounded-xl font-bold">
-              <ShieldCheck className="h-6 w-6" />
+            <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-border/60 bg-primary/10 shadow-lg backdrop-blur-xl dark:border-white/20 dark:bg-white/10">
+              <ShieldCheck className="h-6 w-6 text-foreground" />
             </div>
             <div>
-              <h1 className="font-extrabold text-xl text-gray-900 leading-tight">QR Chef • Sistem Yöneticisi Paneli</h1>
-              <p className="text-xs text-gray-500">Kullanıcı rolleri, e-posta aktivasyonları ve aktif menüler</p>
+              <h1 className="text-xl font-extrabold leading-tight tracking-tight text-foreground">QR Chef <span className="font-medium text-muted-foreground">• Sistem Yöneticisi</span></h1>
+              <p className="hidden text-xs text-muted-foreground sm:block">Kullanıcı rolleri, e-posta aktivasyonları ve aktif menüler</p>
             </div>
           </div>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2">
             {notification && (
-              <span className="text-xs font-semibold bg-green-100 text-green-800 px-3 py-1 rounded-full animate-fade-in flex items-center">
-                <Check className="h-3 w-3 mr-1" /> {notification}
-              </span>
+              <motion.span
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center rounded-full border border-green-500/30 bg-green-500/15 px-3 py-1.5 text-xs font-semibold text-green-700 backdrop-blur-md dark:text-green-300"
+              >
+                <Check className="mr-1 h-3 w-3" /> {notification}
+              </motion.span>
             )}
-            <Button size="sm" onClick={() => setIsAddUserModalOpen(true)}>
-              <Plus className="h-4 w-4 mr-1.5" /> Yeni Kullanıcı & Restoran Tanımla
+            <ThemeToggle />
+            <Button size="sm" className="h-9" onClick={() => setIsAddUserModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-1.5" /> <span className="hidden md:inline">Yeni Kullanıcı & Restoran Tanımla</span><span className="md:hidden">Yeni</span>
             </Button>
-            <Button size="sm" variant="ghost" onClick={handleLogout} className="text-red-600 hover:bg-red-50">
+            <Button size="sm" variant="ghost" onClick={handleLogout} className="h-9 text-red-600 hover:bg-red-500/10">
               <LogOut className="h-4 w-4 mr-1.5" /> Çıkış
             </Button>
           </div>
         </header>
 
-        <main className="container mx-auto px-4 py-6 max-w-7xl space-y-6">
+        <main className="container mx-auto max-w-7xl space-y-6 px-4 py-8">
           {/* Üst Metrik Özetleri */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card className="bg-white shadow-2xs">
+            <Card className="group transition-all hover:-translate-y-0.5 hover:shadow-xl">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-xs font-bold text-gray-500 uppercase">Kayıtlı Restoranlar</CardTitle>
-                <Building2 className="h-4 w-4 text-primary" />
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Kayıtlı Restoranlar</CardTitle>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border/60 bg-primary/10 text-foreground"><Building2 className="h-4 w-4" /></div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-extrabold text-gray-900">{restaurants.length}</div>
+                <div className="text-4xl font-extrabold tracking-tight text-foreground"><CountUp value={restaurants.length} /></div>
                 <p className="text-xs text-green-600 mt-1 font-medium">
                   {restaurants.filter(r => r.status === 'active').length} Aktif • {restaurants.filter(r => r.status === 'pending_activation').length} Aktivasyon Bekliyor
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-2xs">
+            <Card className="group transition-all hover:-translate-y-0.5 hover:shadow-xl">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-xs font-bold text-gray-500 uppercase">Aktif Dijital Menüler</CardTitle>
-                <Utensils className="h-4 w-4 text-primary" />
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Aktif Dijital Menüler</CardTitle>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border/60 bg-primary/10 text-foreground"><Utensils className="h-4 w-4" /></div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-extrabold text-gray-900">{allActiveMenus.length}</div>
-                <p className="text-xs text-gray-500 mt-1">Yayında olan menü sayısı</p>
+                <div className="text-4xl font-extrabold tracking-tight text-foreground"><CountUp value={allActiveMenus.length} /></div>
+                <p className="text-xs text-muted-foreground mt-1">Yayında olan menü sayısı</p>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-2xs">
+            <Card className="group transition-all hover:-translate-y-0.5 hover:shadow-xl">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-xs font-bold text-gray-500 uppercase">Toplam QR Okutma</CardTitle>
-                <QrCode className="h-4 w-4 text-primary" />
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Toplam QR Okutma</CardTitle>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border/60 bg-primary/10 text-foreground"><QrCode className="h-4 w-4" /></div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-extrabold text-gray-900">{totalViews.toLocaleString()}</div>
+                <div className="text-4xl font-extrabold tracking-tight text-foreground"><CountUp value={totalViews} /></div>
                 <p className="text-xs text-green-600 mt-1 font-medium">Masa ve kapı taramaları</p>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-2xs">
+            <Card className="group transition-all hover:-translate-y-0.5 hover:shadow-xl">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-xs font-bold text-gray-500 uppercase">Aktivasyon Mimarisi</CardTitle>
-                <Mail className="h-4 w-4 text-primary" />
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Aktivasyon Mimarisi</CardTitle>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border/60 bg-primary/10 text-foreground"><Mail className="h-4 w-4" /></div>
               </CardHeader>
               <CardContent>
-                <div className="text-base font-bold text-gray-900 flex items-center">
+                <div className="text-base font-bold text-foreground flex items-center">
                   <CheckCircle2 className="h-4 w-4 mr-1 text-green-600" /> Link ile Şifre Belirleme
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Şifreyi kullanıcı kendisi belirler</p>
+                <p className="text-xs text-muted-foreground mt-1">Şifreyi kullanıcı kendisi belirler</p>
               </CardContent>
             </Card>
           </div>
 
           {/* SEKME GEZİNTİSİ */}
-          <div className="flex space-x-2 border-b bg-white p-2 rounded-xl shadow-2xs overflow-x-auto">
-            <button
-              onClick={() => setActiveTab('kullanicilar')}
-              className={`flex items-center space-x-2 py-2 px-4 text-sm rounded-lg font-bold transition-all whitespace-nowrap ${
-                activeTab === 'kullanicilar'
-                  ? 'bg-primary text-white shadow-xs'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <Users className="h-4 w-4" />
-              <span>Kullanıcılar & Restoran Hesapları ({restaurants.length})</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('menuler')}
-              className={`flex items-center space-x-2 py-2 px-4 text-sm rounded-lg font-bold transition-all whitespace-nowrap ${
-                activeTab === 'menuler'
-                  ? 'bg-primary text-white shadow-xs'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <Layers className="h-4 w-4" />
-              <span>Aktif Menüler ({allActiveMenus.length})</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('analitik')}
-              className={`flex items-center space-x-2 py-2 px-4 text-sm rounded-lg font-bold transition-all whitespace-nowrap ${
-                activeTab === 'analitik'
-                  ? 'bg-primary text-white shadow-xs'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <BarChart3 className="h-4 w-4" />
-              <span>Sistem & QR Analitiği</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('ayarlar')}
-              className={`flex items-center space-x-2 py-2 px-4 text-sm rounded-lg font-bold transition-all whitespace-nowrap ${
-                activeTab === 'ayarlar'
-                  ? 'bg-primary text-white shadow-xs'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <SettingsIcon className="h-4 w-4" />
-              <span>Platform Ayarları</span>
-            </button>
+          <div className="flex space-x-1 overflow-x-auto rounded-2xl border border-border/60 bg-card/60 p-1.5 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.07]">
+            {([
+              { id: 'kullanicilar', icon: Users, label: `Kullanıcılar & Restoran Hesapları (${restaurants.length})` },
+              { id: 'menuler', icon: Layers, label: `Aktif Menüler (${allActiveMenus.length})` },
+              { id: 'analitik', icon: BarChart3, label: 'Sistem & QR Analitiği' },
+              { id: 'ayarlar', icon: SettingsIcon, label: 'Platform Ayarları' },
+            ] as const).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`relative flex items-center space-x-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold transition-colors ${
+                  activeTab === tab.id ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {activeTab === tab.id && (
+                  <motion.span
+                    layoutId="admin-tab-pill"
+                    className="absolute inset-0 rounded-xl bg-primary shadow-[0_6px_20px_rgba(15,23,42,0.25)] dark:shadow-[0_0_20px_rgba(255,255,255,0.25)]"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <tab.icon className="relative z-10 h-4 w-4" />
+                <span className="relative z-10">{tab.label}</span>
+              </button>
+            ))}
           </div>
 
           {/* 1. SEKME: KULLANICILAR & RESTORAN HESAPLARI */}
           {activeTab === 'kullanicilar' && (
-            <Card className="bg-white shadow-sm">
+            <Card className="shadow-sm">
               <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                   <CardTitle className="text-lg font-bold">Kullanıcı Hesapları ve Aktivasyon Durumları</CardTitle>
@@ -383,7 +384,7 @@ export function AdminDashboard() {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-gray-50">
+                      <TableRow className="bg-muted/40 hover:bg-muted/40">
                         <TableHead>Restoran & Yetkili</TableHead>
                         <TableHead>E-posta</TableHead>
                         <TableHead>Hesap Durumu</TableHead>
@@ -393,17 +394,17 @@ export function AdminDashboard() {
                     </TableHeader>
                     <TableBody>
                       {filteredRestaurants.map((restaurant) => (
-                        <TableRow key={restaurant.id} className="hover:bg-gray-50">
+                        <TableRow key={restaurant.id} className="hover:bg-accent/50">
                           <TableCell>
                             <div>
-                              <div className="font-bold text-gray-900 text-sm flex items-center">
+                              <div className="font-bold text-foreground text-sm flex items-center">
                                 {restaurant.name}
                               </div>
-                              <div className="text-xs text-gray-500">{(restaurant.ownerName || restaurant.businessInfo?.owner_name || 'Yetkili')} • {(restaurant.businessInfo?.phone || '-')}</div>
+                              <div className="text-xs text-muted-foreground">{(restaurant.ownerName || restaurant.businessInfo?.owner_name || 'Yetkili')} • {(restaurant.businessInfo?.phone || '-')}</div>
                             </div>
                           </TableCell>
                           <TableCell>
-                            <span className="font-mono text-xs text-gray-900 font-semibold">{restaurant.credentials?.email || restaurant.businessInfo?.email || '-'}</span>
+                            <span className="font-mono text-xs text-foreground font-semibold">{restaurant.credentials?.email || restaurant.businessInfo?.email || '-'}</span>
                           </TableCell>
                           <TableCell>
                             {restaurant.status === 'active' ? (
@@ -425,7 +426,7 @@ export function AdminDashboard() {
                               href={`/menu/${restaurant.subdomain}`} 
                               target="_blank" 
                               rel="noreferrer"
-                              className="text-xs text-primary font-mono hover:underline inline-flex items-center"
+                              className="text-xs text-foreground font-mono underline-offset-2 hover:underline inline-flex items-center"
                             >
                               /{restaurant.subdomain} <ExternalLink className="h-3 w-3 ml-1" />
                             </a>
@@ -476,10 +477,10 @@ export function AdminDashboard() {
           {/* 2. SEKME: AKTİF MENÜLER */}
           {activeTab === 'menuler' && (
             <div className="space-y-4">
-              <div className="flex justify-between items-center bg-white p-4 rounded-xl border">
+              <div className="glass-card flex items-center justify-between p-4">
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">Sistemdeki Aktif Dijital Menüler</h2>
-                  <p className="text-xs text-gray-500">Tüm restoranların menü durumları ve canlı bağlantıları</p>
+                  <h2 className="text-lg font-bold text-foreground">Sistemdeki Aktif Dijital Menüler</h2>
+                  <p className="text-xs text-muted-foreground">Tüm restoranların menü durumları ve canlı bağlantıları</p>
                 </div>
                 <div className="w-64 relative">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
@@ -498,13 +499,14 @@ export function AdminDashboard() {
                   const totalItems = menu.categories?.reduce((acc, cat) => acc + (cat.items?.length || 0), 0) || 0
 
                   return (
-                    <Card key={menu.id} className="overflow-hidden bg-white shadow-2xs hover:shadow-md transition-shadow">
+                    <Card key={menu.id} className="overflow-hidden transition-all hover:-translate-y-1 hover:shadow-2xl">
                       <div className="relative h-40 w-full bg-gray-100">
                         <img 
                           src={menu.image_url} 
                           alt={menu.name} 
                           className="w-full h-full object-cover" 
                         />
+                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
                         <div className="absolute top-2 left-2 bg-black/75 text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
                           {restaurant.name}
                         </div>
@@ -519,9 +521,9 @@ export function AdminDashboard() {
                         <CardDescription className="text-xs line-clamp-1">{menu.description || 'Açıklama yok'}</CardDescription>
                       </CardHeader>
                       <CardContent className="p-4 pt-0 space-y-3">
-                        <div className="flex justify-between items-center text-xs text-gray-600 bg-gray-50 p-2 rounded-lg border">
+                        <div className="flex justify-between items-center text-xs text-muted-foreground bg-gray-50 p-2 rounded-lg border">
                           <span>{activeCount} / {menu.categories?.length || 0} Kategori Aktif</span>
-                          <span className="font-bold text-gray-900">{totalItems} Çeşit Yemek</span>
+                          <span className="font-bold text-foreground">{totalItems} Çeşit Yemek</span>
                         </div>
                         <div className="flex gap-2 pt-1">
                           <Button 
@@ -554,7 +556,7 @@ export function AdminDashboard() {
           {activeTab === 'analitik' && (
             <div className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
-                <Card className="bg-white">
+                <Card className="">
                   <CardHeader>
                     <CardTitle className="text-base font-bold">En Çok Menüsü Okutulan Restoranlar</CardTitle>
                     <CardDescription>Müşteri ilgisi ve toplam QR taramaları</CardDescription>
@@ -567,18 +569,18 @@ export function AdminDashboard() {
                           <div className="flex items-center space-x-3">
                             <span className="font-extrabold text-primary text-sm">#{i + 1}</span>
                             <div>
-                              <div className="font-bold text-sm text-gray-900">{r.name}</div>
-                              <div className="text-xs text-gray-500">/{r.subdomain} • {r.businessInfo?.city || 'Belirtilmemiş'}</div>
+                              <div className="font-bold text-sm text-foreground">{r.name}</div>
+                              <div className="text-xs text-muted-foreground">/{r.subdomain} • {r.businessInfo?.city || 'Belirtilmemiş'}</div>
                             </div>
                           </div>
-                          <span className="font-extrabold text-sm text-gray-900">{views.toLocaleString()} Tarama</span>
+                          <span className="font-extrabold text-sm text-foreground">{views.toLocaleString()} Tarama</span>
                         </div>
                       )
                     })}
                   </CardContent>
                 </Card>
 
-                <Card className="bg-white">
+                <Card className="">
                   <CardHeader>
                     <CardTitle className="text-base font-bold">Cihaz Dağılımı</CardTitle>
                     <CardDescription>Müşterilerin menüyü açtığı cihaz türleri</CardDescription>
@@ -589,8 +591,8 @@ export function AdminDashboard() {
                         <span>Mobil Telefonlar (iOS & Android)</span>
                         <span className="text-primary font-bold">%86</span>
                       </div>
-                      <div className="w-full bg-gray-100 rounded-full h-3">
-                        <div className="bg-primary h-3 rounded-full" style={{ width: '86%' }}></div>
+                      <div className="w-full bg-muted rounded-full h-3">
+                        <motion.div className="bg-primary h-3 rounded-full" initial={{ width: 0 }} animate={{ width: '86%' }} transition={{ duration: 0.9, ease: 'easeOut' }} />
                       </div>
                     </div>
                     <div>
@@ -598,8 +600,8 @@ export function AdminDashboard() {
                         <span>Tablet Cihazlar</span>
                         <span className="text-primary font-bold">%10</span>
                       </div>
-                      <div className="w-full bg-gray-100 rounded-full h-3">
-                        <div className="bg-primary h-3 rounded-full" style={{ width: '10%' }}></div>
+                      <div className="w-full bg-muted rounded-full h-3">
+                        <motion.div className="bg-primary h-3 rounded-full" initial={{ width: 0 }} animate={{ width: '10%' }} transition={{ duration: 0.9, ease: 'easeOut' }} />
                       </div>
                     </div>
                   </CardContent>
@@ -610,7 +612,7 @@ export function AdminDashboard() {
 
           {/* 4. SEKME: PLATFORM AYARLARI */}
           {activeTab === 'ayarlar' && (
-            <Card className="bg-white max-w-3xl mx-auto">
+            <Card className="max-w-3xl mx-auto">
               <CardHeader>
                 <CardTitle className="text-lg font-bold">Sistem ve Platform Genel Ayarları</CardTitle>
                 <CardDescription>Tüm menü sistemi için geçerli genel yapılandırmalar</CardDescription>
@@ -686,7 +688,7 @@ export function AdminDashboard() {
                 onChange={(e) => setFormEmail(e.target.value)}
                 required
               />
-              <p className="text-[11px] text-gray-500">Aktivasyon linki bu e-posta adresi ile ilişkilendirilecektir.</p>
+              <p className="text-[11px] text-muted-foreground">Aktivasyon linki bu e-posta adresi ile ilişkilendirilecektir.</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -713,7 +715,7 @@ export function AdminDashboard() {
             <div className="space-y-1 pt-1 border-t">
               <Label htmlFor="r-slug">Menü Özel Linki (Subdomain)</Label>
               <div className="flex items-center space-x-1">
-                <span className="text-xs text-gray-500 font-mono">qolay.com/menu/</span>
+                <span className="text-xs text-muted-foreground font-mono">qolay.com/menu/</span>
                 <Input
                   id="r-slug"
                   placeholder="bogaz-gurme"
@@ -748,12 +750,12 @@ export function AdminDashboard() {
               <DialogHeader>
                 <DialogTitle>Aktivasyon Daveti Oluşturuldu!</DialogTitle>
                 <DialogDescription>
-                  <strong className="text-gray-900">{activationModalData.restaurantName}</strong> ({activationModalData.email}) için aktivasyon linki hazırlandı.
+                  <strong className="text-foreground">{activationModalData.restaurantName}</strong> ({activationModalData.email}) için aktivasyon linki hazırlandı.
                 </DialogDescription>
               </DialogHeader>
 
               <div className="p-3 bg-gray-50 border rounded-xl text-left space-y-2">
-                <span className="text-xs font-semibold text-gray-600">Aktivasyon & Şifre Belirleme Linki:</span>
+                <span className="text-xs font-semibold text-muted-foreground">Aktivasyon & Şifre Belirleme Linki:</span>
                 <div className="flex items-center justify-between gap-2 p-2 bg-white rounded border font-mono text-xs">
                   <span className="truncate text-primary">{activationModalData.activationLink}</span>
                   <Button 
@@ -768,7 +770,7 @@ export function AdminDashboard() {
                     <Copy className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                <p className="text-[11px] text-gray-500">
+                <p className="text-[11px] text-muted-foreground">
                   Bu linki müşterinize iletebilirsiniz. Müşteri linke tıkladığında kendi şifresini belirleyerek anında giriş yapacaktır.
                 </p>
               </div>

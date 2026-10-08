@@ -5,6 +5,10 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+const SUPER_ADMIN_EMAIL = (
+  process.env.SUPER_ADMIN_EMAIL || 'gokdenizakalin7@gmail.com'
+).toLowerCase()
+
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
@@ -26,16 +30,22 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user organization
+    const email = (user.email || '').toLowerCase()
+    const isSuperAdmin = email === SUPER_ADMIN_EMAIL
+
     const { data: memberData } = await supabase
       .from('organization_members')
       .select('organization_id, role, organizations(name, subdomain, business_phone)')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
+
+    const memberRole = memberData?.role || 'restaurant'
+    const role = isSuperAdmin ? 'superadmin' : memberRole
 
     const responseData = {
       id: user.id,
       email: user.email,
-      role: memberData?.role || 'user',
+      role,
       organization: memberData ? {
         id: memberData.organization_id,
         name: (memberData.organizations as any)?.name,

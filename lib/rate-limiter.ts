@@ -32,6 +32,13 @@ export interface RateLimitResult {
   resetSeconds: number
 }
 
+/** Yerel geliştirmede veya DISABLE_RATE_LIMIT=true ile tüm limitler kapalı. */
+export function isRateLimitEnabled(): boolean {
+  if (process.env.DISABLE_RATE_LIMIT === 'true') return false
+  if (process.env.NODE_ENV === 'development') return false
+  return true
+}
+
 /**
  * Belirtilen anahtar için hız sınırını kontrol eder.
  * @param key Benzersiz kimlik (örn: IP adresi, restoran ID, kullanıcı ID)
@@ -43,6 +50,15 @@ export function checkRateLimit(
   limit: number,
   windowSeconds: number
 ): RateLimitResult {
+  if (!isRateLimitEnabled()) {
+    return {
+      success: true,
+      limit,
+      remaining: limit,
+      resetSeconds: windowSeconds,
+    }
+  }
+
   const now = Date.now()
   const windowMs = windowSeconds * 1000
   const record = memoryStore.get(key)
@@ -81,6 +97,42 @@ export function checkRateLimit(
     limit,
     remaining,
     resetSeconds
+  }
+}
+
+// Ürün başına kullanım kotası (geliştirme ortamında da çalışır, DISABLE_RATE_LIMIT'ten etkilenmez)
+const quotaStore = new Map<string, RateLimitRecord>()
+
+export interface QuotaStatus {
+  allowed: boolean
+  used: number
+  limit: number
+  resetSeconds: number
+}
+
+/** Mevcut kullanımı sayaç artırmadan okur. */
+export function getQuota(key: string, limit: number): QuotaStatus {
+  const now = Date.now()
+  const record = quotaStore.get(key)
+  if (!record || now > record.resetTime) {
+    return { allowed: true, used: 0, limit, resetSeconds: 0 }
+  }
+  return {
+    allowed: record.count < limit,
+    used: record.count,
+    limit,
+    resetSeconds: Math.max(1, Math.ceil((record.resetTime - now) / 1000)),
+  }
+}
+
+/** Başarılı bir kullanımı sayaca ekler. */
+export function consumeQuota(key: string, windowSeconds: number): void {
+  const now = Date.now()
+  const record = quotaStore.get(key)
+  if (!record || now > record.resetTime) {
+    quotaStore.set(key, { count: 1, resetTime: now + windowSeconds * 1000 })
+  } else {
+    record.count += 1
   }
 }
 
@@ -123,6 +175,8 @@ export const RATE_LIMITS = {
   MENU_SCAN: { limit: 5, windowSeconds: 600 },
   // AI Kalori Tahmini: 1 dakikada en fazla 30 istek (Toplu tarama desteği)
   CALORIE_ESTIMATE: { limit: 30, windowSeconds: 60 },
+  // AI Kalori Tahmini: aynı ürün için kullanıcı başına 24 saatte en fazla 2 hesaplama
+  CALORIE_PER_ITEM: { limit: 2, windowSeconds: 86400 },
   // Giriş Yapma: 15 dakikada en fazla 5 deneme (Brute-force koruması)
   AUTH_LOGIN: { limit: 5, windowSeconds: 900 },
   // Genel API rotaları: Dakikada en fazla 100 istek (DDoS & Scraping koruması)
