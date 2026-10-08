@@ -23,7 +23,7 @@ export function MenusContent() {
     return null
   })
 
-  const subdomain = currentRestaurant?.subdomain || 'lezzet-ocakbasi'
+  const subdomain = currentRestaurant?.subdomain || ''
   const [menus, setMenus] = useState<Menu[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
