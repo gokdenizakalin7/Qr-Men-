@@ -8,6 +8,8 @@ export interface CompressOptions {
   maxDimension?: number
   quality?: number
   format?: 'image/webp' | 'image/jpeg'
+  /** WebP desteklenmezse kullanılacak biçim (şeffaf logolar için PNG) */
+  fallbackFormat?: 'image/jpeg' | 'image/png'
 }
 
 export interface CompressResult {
@@ -26,6 +28,13 @@ export const IMAGE_PRESETS = {
     maxDimension: 800,
     quality: 0.80,
     format: 'image/webp' as const
+  },
+  // Logo: küçük, şeffaflığı korur
+  LOGO: {
+    maxDimension: 512,
+    quality: 0.9,
+    format: 'image/webp' as const,
+    fallbackFormat: 'image/png' as const
   },
   // Menü kapak fotoğrafları: Menü listesi ve başlık kartları için optimize
   MENU_COVER: {
@@ -103,12 +112,13 @@ export async function compressImageFile(
 
         // WebP destek kontrolü ile çıktı al
         let dataUrl = canvas.toDataURL(format, quality)
-        let actualMime = format
+        let actualMime: string = format
 
         // Eğer tarayıcı webp desteklemiyorsa otomatik image/jpeg'e döner
         if (format === 'image/webp' && !dataUrl.startsWith('data:image/webp')) {
-          dataUrl = canvas.toDataURL('image/jpeg', quality)
-          actualMime = 'image/jpeg'
+          const fb = options.fallbackFormat || 'image/jpeg'
+          dataUrl = canvas.toDataURL(fb, quality)
+          actualMime = fb
         }
 
         // Boyut hesaplama (Base64 uzunluğu / 1.37)

@@ -1210,5 +1210,72 @@ export const PRESET_MENU_TEMPLATES: MenuTemplate[] = [
         ]
       }
     ]
+  },
+
+  // 4. NARGİLE KAFE
+  {
+    id: 'nargile-kafe',
+    name: 'Nargile Kafe & Çay Bahçesi',
+    tagline: 'Meyveli nargileler, demli çay, sıcak ve soğuk içecekler, atıştırmalıklar',
+    venueType: 'Nargile Kafe',
+    icon: '💨',
+    color: '#0f766e',
+    coverImage: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&h=400&fit=crop',
+    description: 'Özenle hazırlanan meyveli ve klasik nargile çeşitleri, bakır cezvede Türk kahvesi, tavşankanı çay ve serinleten içecekler.',
+    categories: [
+      {
+        id: 'tmpl-ng-1',
+        name: 'Nargileler',
+        description: 'Tüm nargileler taze kömür ve yeni hortumla servis edilir',
+        is_active: true,
+        display_order: 1,
+        items: [
+          { id: 'item-ng-1-1', name: 'Çift Elma Nargile', description: 'Klasik anason aromalı çift elma.', price: '450 ₺', image_url: '', display_order: 1, is_available: true, is_featured: true },
+          { id: 'item-ng-1-2', name: 'Nane Limon Nargile', description: 'Ferah nane ve limon karışımı.', price: '450 ₺', image_url: '', display_order: 2, is_available: true },
+          { id: 'item-ng-1-3', name: 'Karpuz Nane Nargile', description: 'Yaz aylarının favorisi serin karışım.', price: '450 ₺', image_url: '', display_order: 3, is_available: true },
+          { id: 'item-ng-1-4', name: 'Kavun Nargile', description: 'Tatlı ve yumuşak içimli kavun aroması.', price: '450 ₺', image_url: '', display_order: 4, is_available: true },
+          { id: 'item-ng-1-5', name: 'Yenileme (Kömür & Hortum)', description: 'Taze kömür değişimi.', price: '120 ₺', image_url: '', display_order: 5, is_available: true }
+        ]
+      },
+      {
+        id: 'tmpl-ng-2',
+        name: 'Sıcak İçecekler',
+        description: 'Demli çaylar, Türk kahvesi ve kış içecekleri',
+        is_active: true,
+        display_order: 2,
+        items: [
+          { id: 'item-ng-2-1', name: 'Demlik Çay', description: 'İki kişilik tavşankanı demlik çay.', price: '120 ₺', calories: 2, image_url: '', display_order: 1, is_available: true, is_featured: true },
+          { id: 'item-ng-2-2', name: 'Türk Kahvesi', description: 'Közde pişmiş, lokum ile servis edilir.', price: '110 ₺', calories: 15, image_url: '', display_order: 2, is_available: true },
+          { id: 'item-ng-2-3', name: 'Sahlep', description: 'Tarçınlı sıcak sahlep.', price: '130 ₺', calories: 210, allergens: ['Süt Ürünleri'], image_url: '', display_order: 3, is_available: true },
+          { id: 'item-ng-2-4', name: 'Bitki Çayları', description: 'Ihlamur, adaçayı, kuşburnu.', price: '100 ₺', calories: 3, image_url: '', display_order: 4, is_available: true }
+        ]
+      },
+      {
+        id: 'tmpl-ng-3',
+        name: 'Soğuk İçecekler',
+        description: 'Ferahlatan içecekler ve limonatalar',
+        is_active: true,
+        display_order: 3,
+        items: [
+          { id: 'item-ng-3-1', name: 'Ev Yapımı Limonata', description: 'Taze sıkılmış limon ve nane.', price: '120 ₺', calories: 110, image_url: '', display_order: 1, is_available: true },
+          { id: 'item-ng-3-2', name: 'Buzlu Çay (Şeftali / Limon)', description: 'Soğuk demlenmiş meyveli çay.', price: '100 ₺', calories: 90, image_url: '', display_order: 2, is_available: true },
+          { id: 'item-ng-3-3', name: 'Kutu İçecekler', description: 'Kola, gazoz, soda, maden suyu.', price: '80 ₺', calories: 140, image_url: '', display_order: 3, is_available: true },
+          { id: 'item-ng-3-4', name: 'Taze Sıkılmış Portakal Suyu', description: 'Günlük sıkılır.', price: '140 ₺', calories: 120, image_url: '', display_order: 4, is_available: true }
+        ]
+      },
+      {
+        id: 'tmpl-ng-4',
+        name: 'Atıştırmalıklar & Tatlılar',
+        description: 'Sohbete eşlik eden hafif lezzetler',
+        is_active: true,
+        display_order: 4,
+        items: [
+          { id: 'item-ng-4-1', name: 'Karışık Kuruyemiş Tabağı', description: 'Fındık, badem, kaju, kuru meyve.', price: '220 ₺', calories: 420, allergens: ['Kuruyemiş'], image_url: '', display_order: 1, is_available: true },
+          { id: 'item-ng-4-2', name: 'Meyve Tabağı', description: 'Mevsim meyveleri.', price: '250 ₺', calories: 180, image_url: '', display_order: 2, is_available: true },
+          { id: 'item-ng-4-3', name: 'Sıcak Tost', description: 'Kaşarlı veya sucuklu.', price: '180 ₺', calories: 380, allergens: ['Gluten', 'Süt Ürünleri'], image_url: '', display_order: 3, is_available: true },
+          { id: 'item-ng-4-4', name: 'Cheesecake', description: 'Orman meyveli soslu.', price: '190 ₺', calories: 380, allergens: ['Gluten', 'Süt Ürünleri', 'Yumurta'], image_url: '', display_order: 4, is_available: true }
+        ]
+      }
+    ]
   }
 ]

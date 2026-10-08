@@ -12,11 +12,13 @@ import { ThemeToggle } from '@/components/theme/PanelTheme'
 export function Header({ 
   setIsSidebarOpen, 
   restaurantName,
-  subdomain 
+  subdomain,
+  logoUrl
 }: { 
   setIsSidebarOpen: (open: boolean) => void;
   restaurantName?: string;
   subdomain?: string;
+  logoUrl?: string;
 }) {
   const navigate = useNavigate()
 
@@ -52,7 +54,7 @@ export function Header({
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-9 w-9 rounded-full">
               <Avatar className="h-9 w-9 border">
-                <AvatarImage src="" alt="Kullanıcı Avatarı" />
+                <AvatarImage src={logoUrl || ""} alt="Restoran logosu" className="object-contain bg-white" />
                 <AvatarFallback className="bg-primary/10 text-primary font-bold">
                   {(restaurantName || 'RP').slice(0, 2).toUpperCase()}
                 </AvatarFallback>

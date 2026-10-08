@@ -7,9 +7,8 @@ import { Button } from '@/components/ui/button'
 import { authFetch } from '@/lib/api-client'
 
 /**
- * Enterprise Admin Rota Kalkanı (AdminGuard)
+ * Admin Rota Kalkanı (AdminGuard)
  * /admin/* rotalarına yalnızca 'superadmin' veya 'admin' rolündeki kullanıcıların erişmesini sağlar.
- * Restoran kullanıcıları veya yetkisiz kişiler erişmeye çalıştığında anında bloklar ve yönlendirir.
  */
 export function AdminGuard({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
@@ -74,7 +73,6 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
     )
   }
 
-  // Yetkisiz Erişim Ekranı (403 Forbidden Shield)
   if (!isAuthorized) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800 p-4">
@@ -117,43 +115,49 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+type GuardState = 'loading' | 'ok' | 'denied'
+
 /**
- * Enterprise Oturum Kalkanı (AuthGuard)
- * /dashboard/* rotalarına yalnızca giriş yapmış kullanıcıların erişmesini sağlar.
+ * Oturum Kalkanı (AuthGuard)
+ * /dashboard/* için giriş zorunlu. Onboarding'i bitmemiş restoran kullanıcısı /onboarding'e gider.
  */
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+  const [state, setState] = useState<GuardState>('loading')
 
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     let isMounted = true
-    const checkAuthStatus = async () => {
+    const check = async () => {
       try {
         const res = await authFetch('/api/auth/me')
-        if (isMounted) {
-          if (res.ok) {
-            setIsAuthenticated(true)
-          } else {
-            setIsAuthenticated(false)
-            navigate('/login')
-          }
+        if (!isMounted) return
+        if (!res.ok) {
+          setState('denied')
+          navigate('/login')
+          return
         }
+        const me = await res.json()
+        const isAdmin = me.role === 'superadmin' || me.role === 'admin'
+        if (!isAdmin && me.organization && !me.organization.onboardingCompleted) {
+          navigate('/onboarding', { replace: true })
+          return
+        }
+        setState('ok')
       } catch (e) {
         if (isMounted) {
-          setIsAuthenticated(false)
+          setState('denied')
           navigate('/login')
         }
       }
     }
-
-    checkAuthStatus()
+    check()
 
     return () => { isMounted = false }
   }, [navigate])
 
-  if (isAuthenticated === null) {
+  if (state === 'loading') {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-gray-50">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -161,7 +165,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (!isAuthenticated) {
+  if (state === 'denied') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
         <div className="w-full max-w-sm rounded-xl bg-white p-6 text-center shadow-lg space-y-4">
@@ -178,5 +182,47 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     )
   }
 
+  return <>{children}</>
+}
+
+/**
+ * Onboarding Kalkanı: giriş zorunlu; onboarding'i bitmiş kullanıcı /dashboard'a gider.
+ */
+export function OnboardingGuard({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate()
+  const [ok, setOk] = useState(false)
+
+  useEffect(() => {
+    let isMounted = true
+    ;(async () => {
+      try {
+        const res = await authFetch('/api/auth/me')
+        if (!isMounted) return
+        if (!res.ok) {
+          navigate('/login', { replace: true })
+          return
+        }
+        const me = await res.json()
+        if (me.role === 'superadmin' || me.role === 'admin') {
+          navigate('/admin', { replace: true })
+        } else if (!me.organization || me.organization.onboardingCompleted) {
+          navigate('/dashboard', { replace: true })
+        } else {
+          setOk(true)
+        }
+      } catch {
+        if (isMounted) navigate('/login', { replace: true })
+      }
+    })()
+    return () => { isMounted = false }
+  }, [navigate])
+
+  if (!ok) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-gray-50">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    )
+  }
   return <>{children}</>
 }

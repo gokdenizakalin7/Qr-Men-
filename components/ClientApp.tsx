@@ -7,9 +7,12 @@ import { PageTransition, useSmoothScroll, useRevealOnScroll } from '@/components
 import { LandingPage } from '@/components/landing/LandingPage'
 import { BusinessDirectory } from '@/components/landing/BusinessDirectory'
 import { Login } from '@/components/auth/Login'
+import { Signup } from '@/components/auth/Signup'
+import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard'
+import { RestaurantProvider, useRestaurant } from '@/components/providers/RestaurantProvider'
 import { AccountActivation } from '@/components/auth/AccountActivation'
 import { AdminDashboard } from '@/components/admin/AdminDashboard'
-import { AdminGuard, AuthGuard } from '@/components/auth/RouteGuards'
+import { AdminGuard, AuthGuard, OnboardingGuard } from '@/components/auth/RouteGuards'
 
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { PanelThemeProvider, PanelBackground } from '@/components/theme/PanelTheme'
@@ -21,10 +24,6 @@ import { EditMenuContent } from '@/components/dashboard/EditMenuContent'
 import { QRCodesContent } from '@/components/dashboard/QRCodesContent'
 import { SettingsContent } from '@/components/dashboard/SettingsContent'
 import { PublicMenuView } from '@/components/public/PublicMenuView'
-import { MOCK_RESTAURANTS } from '@/lib/mock-data'
-import { Restaurant } from '@/lib/types'
-import { safeJsonParse } from '@/lib/utils'
-import { authFetch } from '@/lib/api-client'
 
 function DashboardLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -32,54 +31,12 @@ function DashboardLayout() {
   const mainRef = useRef<HTMLElement>(null)
   useSmoothScroll(mainRef)
   useRevealOnScroll(mainRef)
-  const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant | null>(null)
-  const [userRole, setUserRole] = useState<string>('restaurant')
+  const { restaurant: currentRestaurant, role: userRole, email, isLoading } = useRestaurant()
 
   useEffect(() => {
-    async function loadSession() {
-      try {
-        // AuthGuard ile aynı isteği paylaşır (önbellek + tekilleştirme)
-        const res = await authFetch('/api/auth/me')
-
-        if (res.ok) {
-          const data = await res.json()
-          setUserRole(data.role)
-          
-          if (data.organization) {
-            const currentObj = {
-              id: data.organization.id,
-              subdomain: data.organization.subdomain,
-              name: data.organization.name || 'Restoranım',
-              role: data.role,
-              status: 'active',
-              currency: '₺',
-              businessInfo: {
-                email: data.email || 'yonetici@restoran.com',
-                business_phone: data.organization.business_phone
-              }
-            }
-            setCurrentRestaurant(currentObj as Restaurant)
-            localStorage.setItem('currentRestaurant', JSON.stringify(currentObj))
-          }
-        } else {
-          // Eğer giriş yapmamışsa, login'e yönlendirebiliriz, ancak şimdilik sessizce bırakıyoruz.
-          // Çünkü bu layout /dashboard altında korunuyor (AuthGuard ile).
-        }
-      } catch (err) {
-        console.error("Failed to load session", err)
-      }
-    }
-    
-    loadSession()
-
     const handleResize = () => {
-      if (window.innerWidth >= 1024) {
-        setIsSidebarOpen(true)
-      } else {
-        setIsSidebarOpen(false)
-      }
+      setIsSidebarOpen(window.innerWidth >= 1024)
     }
-
     handleResize()
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
@@ -87,7 +44,8 @@ function DashboardLayout() {
 
   const userInfo = {
     name: currentRestaurant?.name || 'Yükleniyor...',
-    email: currentRestaurant?.businessInfo?.email || '...'
+    email: email || '...',
+    logoUrl: currentRestaurant?.branding?.logoUrl || ''
   }
 
   return (
@@ -106,10 +64,16 @@ function DashboardLayout() {
           setIsSidebarOpen={setIsSidebarOpen} 
           restaurantName={currentRestaurant?.name}
           subdomain={currentRestaurant?.subdomain}
+          logoUrl={currentRestaurant?.branding?.logoUrl}
         />
 
         <main ref={mainRef} className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6">
           <PageTransition mainRef={mainRef}>
+            {isLoading ? (
+              <div className="flex h-64 items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+              </div>
+            ) : (
             <Routes location={location}>
               <Route index element={<DashboardContent />} />
               <Route path="" element={<DashboardContent />} />
@@ -128,6 +92,7 @@ function DashboardLayout() {
               <Route path="/settings" element={<SettingsContent />} />
               <Route path="*" element={<DashboardContent />} />
             </Routes>
+            )}
           </PageTransition>
         </main>
       </div>
@@ -201,9 +166,11 @@ export function ClientApp() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/onboarding" element={<OnboardingGuard><OnboardingWizard /></OnboardingGuard>} />
           <Route path="/activate" element={<AccountActivation />} />
           <Route path="/admin/*" element={<AdminGuard><AdminDashboard /></AdminGuard>} />
-          <Route path="/dashboard/*" element={<AuthGuard><DashboardLayout /></AuthGuard>} />
+          <Route path="/dashboard/*" element={<AuthGuard><RestaurantProvider><DashboardLayout /></RestaurantProvider></AuthGuard>} />
           <Route path="/business" element={<BusinessDirectory />} />
           <Route path="/menu/:subdomain" element={<PublicMenuView />} />
           <Route path="*" element={<LandingPage />} />

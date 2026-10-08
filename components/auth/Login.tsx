@@ -86,7 +86,7 @@ export function Login() {
         localStorage.removeItem('is_admin')
         
         setClientSession({ role: meData.role, restaurant: org, userId: meData.id })
-        window.location.href = '/dashboard'
+        window.location.href = org.onboardingCompleted === false ? '/onboarding' : '/dashboard'
       } else {
         setError('Hesabınıza atanmış bir restoran bulunamadı. Lütfen yönetici ile iletişime geçin.')
         await supabase.auth.signOut()
@@ -208,7 +208,12 @@ export function Login() {
           </form>
         </div>
 
-        <div className="mt-10 text-center">
+        <p className="mt-6 text-center text-sm text-white/60">
+          Hesabınız yok mu?{' '}
+          <Link to="/signup" className="font-bold text-white underline">Ücretsiz kayıt olun</Link>
+        </p>
+
+        <div className="mt-6 text-center">
           <p className="text-sm font-medium text-white/40">
             2026 © QR Chef Yönetim Sistemi
           </p>

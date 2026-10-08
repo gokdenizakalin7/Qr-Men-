@@ -240,7 +240,7 @@ function AdminDashboardInner() {
   )
 
   const totalViews = restaurants.reduce((acc, r) => {
-    return acc + (r.tables?.reduce((tAcc, t) => tAcc + (t.views || 0), 0) || 0)
+    return acc + (r.tables?.reduce((tAcc: number, t: { views?: number }) => tAcc + (t.views || 0), 0) || 0)
   }, 4850)
 
   return (
@@ -563,7 +563,7 @@ function AdminDashboardInner() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {restaurants.map((r, i) => {
-                      const views = r.tables?.reduce((a, t) => a + (t.views || 0), 0) || (1200 - i * 300)
+                      const views = r.tables?.reduce((a: number, t: { views?: number }) => a + (t.views || 0), 0) || (1200 - i * 300)
                       return (
                         <div key={r.id} className="p-3 bg-gray-50 rounded-xl border flex items-center justify-between">
                           <div className="flex items-center space-x-3">

@@ -11,23 +11,44 @@ import {
   ArrowRight,
   Settings
 } from 'lucide-react'
-import { Restaurant } from '@/lib/types'
-import { safeJsonParse } from '@/lib/utils'
+import { CheckCircle2, Circle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { authFetch } from '@/lib/api-client'
+import { useRestaurant } from '@/components/providers/RestaurantProvider'
+import { buildChecklist } from '@/lib/restaurant-profile'
 
 export function DashboardContent() {
-  const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant | null>(null)
+  const { restaurant: currentRestaurant } = useRestaurant()
   const navigate = useNavigate()
+  const [hasMenu, setHasMenu] = useState<boolean | null>(null)
+  const [hasTables, setHasTables] = useState<boolean | null>(null)
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('currentRestaurant')
-      if (stored) {
-        const parsed = safeJsonParse<any>(stored, null)
-        setCurrentRestaurant(parsed)
+    const sub = currentRestaurant?.subdomain
+    if (!sub) return
+    let alive = true
+    ;(async () => {
+      try {
+        const [m, t] = await Promise.all([
+          authFetch(`/api/menus/load?subdomain=${sub}`),
+          authFetch(`/api/tables/load?subdomain=${sub}`),
+        ])
+        const md = m.ok ? await m.json() : null
+        const td = t.ok ? await t.json() : null
+        if (!alive) return
+        setHasMenu(!!md?.menus?.length)
+        setHasTables(!!td?.tables?.length)
+      } catch {
+        // kontrol listesi yalnızca bilgi amaçlı
       }
-    }
-  }, [])
+    })()
+    return () => { alive = false }
+  }, [currentRestaurant?.subdomain])
+
+  const checklist = buildChecklist(currentRestaurant, { hasMenu: !!hasMenu, hasTables: !!hasTables })
+  const doneCount = checklist.filter((c) => c.done).length
+  const showChecklist = hasMenu !== null && doneCount < checklist.length
+  const logoUrl = currentRestaurant?.branding?.logoUrl
 
   return (
     <motion.div
@@ -45,7 +66,7 @@ export function DashboardContent() {
         <div className="absolute -right-16 -bottom-16 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
 
         <div data-reveal className="w-24 h-24 bg-primary/10 text-foreground rounded-[28px] flex items-center justify-center mb-2 z-10 shadow-2xl border border-border/60 backdrop-blur-xl dark:border-white/20 dark:bg-white/10">
-          <img src="/logo.jpg" alt="Logo" className="w-full h-full object-contain rounded-[28px]" />
+          <img src={logoUrl || "/logo.jpg"} alt="Logo" className="w-full h-full object-contain rounded-[28px]" />
         </div>
         <h1 data-reveal className="text-4xl md:text-5xl font-extrabold text-foreground tracking-tight z-10">
           Hoş Geldiniz, {currentRestaurant?.name || 'Değerli İşletmeci'}!
@@ -59,6 +80,36 @@ export function DashboardContent() {
           </Button>
         </div>
       </div>
+
+      {showChecklist && (
+        <Card data-reveal className="border-primary/30">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="text-lg">Kurulumu tamamla</CardTitle>
+              <span className="text-xs font-bold text-muted-foreground">{doneCount} / {checklist.length}</span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
+              <div className="h-full bg-primary transition-all" style={{ width: `${(doneCount / checklist.length) * 100}%` }} />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {checklist.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => navigate(item.href.replace('/dashboard/', ''))}
+                  className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card/50 px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent"
+                >
+                  {item.done ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" /> : <Circle className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                  <span className={item.done ? 'text-muted-foreground line-through' : 'font-semibold'}>{item.label}</span>
+                  {!item.done && <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground" />}
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Hızlı Erişim Kartları */}
       <div data-reveal-group className="grid gap-6 md:grid-cols-3">

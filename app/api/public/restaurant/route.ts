@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
+const PUBLIC_COLUMNS =
+  'id, name, logo_url, cover_url, primary_color, currency, address, city, business_phone, wifi_name, wifi_password, business_type, instagram_handle, whatsapp_number, google_maps_url, google_review_url, working_hours';
+const LEGACY_COLUMNS =
+  'id, name, logo_url, cover_url, primary_color, currency, address, city, business_phone, wifi_name, wifi_password';
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -10,15 +15,24 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Subdomain is required' }, { status: 400 });
     }
 
-    // Yalnızca güvenli alanları seçiyoruz.
-    const { data, error } = await supabaseAdmin
+    // Yalnızca güvenli alanları seçiyoruz. (Migration 04 çalışmadıysa eski sütunlara düş.)
+    let { data, error } = await supabaseAdmin
       .from('organizations')
-      .select('id, name, logo_url, cover_url, primary_color, currency, address, city, business_phone, wifi_name, wifi_password')
+      .select(PUBLIC_COLUMNS)
       .eq('subdomain', subdomain)
-      .single();
+      .maybeSingle();
+
+    if (error) {
+      const legacy = await supabaseAdmin
+        .from('organizations')
+        .select(LEGACY_COLUMNS)
+        .eq('subdomain', subdomain)
+        .maybeSingle();
+      data = legacy.data as any;
+      error = legacy.error;
+    }
 
     if (error || !data) {
-      console.error('Restaurant not found for subdomain:', subdomain, error);
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 404 });
     }
 

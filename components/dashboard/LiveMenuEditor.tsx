@@ -46,6 +46,9 @@ import { getStoredMenus, setStoredMenus } from '@/lib/mock-data'
 import { PRESET_MENU_TEMPLATES, MenuTemplate } from '@/lib/menu-templates'
 import { sanitizeText, sanitizeMultilineText, sanitizePrice } from '@/lib/sanitizer'
 import { ScanMenuModal } from '@/components/modals/ScanMenuModal'
+import { useRestaurant } from '@/components/providers/RestaurantProvider'
+import { usePublicMenuPreview } from '@/lib/use-public-menu-preview'
+import { getBusinessType } from '@/lib/business-types'
 import { setScrollNavGuard } from '@/components/dashboard/ScrollNavigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
@@ -209,18 +212,9 @@ export function LiveMenuEditor() {
   const [searchParams] = useSearchParams()
   const menuIdParam = searchParams.get('menu')
 
-  const [currentRestaurant] = useState<Restaurant | null>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('currentRestaurant')
-      if (stored) {
-        const parsed = safeJsonParse<Restaurant | null>(stored, null)
-        if (parsed) return parsed
-      }
-    }
-    return null
-  })
+  const { restaurant: currentRestaurant } = useRestaurant()
 
-  const subdomain = currentRestaurant?.subdomain || 'lezzet-ocakbasi'
+  const subdomain = currentRestaurant?.subdomain || ''
   const [isLoading, setIsLoading] = useState(true)
 
   const [menu, setMenu] = useState<Menu | null>(() => {
@@ -274,37 +268,7 @@ export function LiveMenuEditor() {
   const [wifiCopied, setWifiCopied] = useState(false)
 
   // Müşterinin gördüğü gerçek menü sayfasını iframe içinde gösterir; düzenlemeler postMessage ile aktarılır
-  const previewIframeRef = useRef<HTMLIFrameElement>(null)
-  const sendPreviewData = React.useCallback(() => {
-    previewIframeRef.current?.contentWindow?.postMessage(
-      {
-        type: 'qr-preview-data',
-        menu,
-        primaryColor,
-        restaurant: {
-          id: currentRestaurant?.id,
-          name: currentRestaurant?.name,
-          cover_url: currentRestaurant?.branding?.bannerUrl,
-          address: currentRestaurant?.businessInfo?.address,
-          city: currentRestaurant?.businessInfo?.city,
-          wifi_name: currentRestaurant?.businessInfo?.wifi_name,
-          wifi_password: currentRestaurant?.businessInfo?.wifi_password,
-          branding: { primaryColor },
-        },
-      },
-      window.location.origin
-    )
-  }, [menu, primaryColor, currentRestaurant])
-  useEffect(() => {
-    sendPreviewData()
-  }, [sendPreviewData])
-  useEffect(() => {
-    const onMessage = (e: MessageEvent) => {
-      if (e.origin === window.location.origin && e.data?.type === 'qr-preview-ready') sendPreviewData()
-    }
-    window.addEventListener('message', onMessage)
-    return () => window.removeEventListener('message', onMessage)
-  }, [sendPreviewData])
+  const previewIframeRef = usePublicMenuPreview({ menu, restaurant: currentRestaurant, primaryColor })
   const [savedSuccess, setSavedSuccess] = useState(false)
 
   // HAZIR MENÜ ŞABLONU MODALI STATE'İ
@@ -425,6 +389,33 @@ export function LiveMenuEditor() {
       setScrollNavGuard(null)
     }
   }, [isDirty])
+
+  // Onboarding'den gelen ?start=scan|template|blank yönlendirmesi (bir kez çalışır)
+  const startHandledRef = useRef(false)
+  useEffect(() => {
+    const start = searchParams.get('start')
+    if (!start || isLoading || !subdomain || startHandledRef.current) return
+    startHandledRef.current = true
+    const templateId = searchParams.get('template')
+    navigate('/dashboard/menu-editor', { replace: true })
+    if (menu) return
+    if (start === 'scan') setIsScanMenuModalOpen(true)
+    else if (start === 'blank') handleCreateBlankMenu()
+    else if (start === 'template') {
+      const tmpl = PRESET_MENU_TEMPLATES.find((t) => t.id === templateId)
+      if (tmpl) handleApplyTemplate(tmpl)
+      else setIsTemplateModalOpen(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, subdomain, searchParams, menu])
+
+  // Restoran türüne uygun şablon en başta gösterilir
+  const orderedTemplates = useMemo(() => {
+    const recommendedId = getBusinessType(currentRestaurant?.businessType)?.templateId
+    return [...PRESET_MENU_TEMPLATES].sort(
+      (a, b) => (b.id === recommendedId ? 1 : 0) - (a.id === recommendedId ? 1 : 0)
+    )
+  }, [currentRestaurant?.businessType])
 
   // HAZIR MENÜ ŞABLONUNU YÜKLE
   const handleApplyTemplate = (tmpl: MenuTemplate) => {
@@ -1094,7 +1085,7 @@ export function LiveMenuEditor() {
               Tek Tıkla Yükleyebileceğiniz Popüler Hazır Menü Paketleri:
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {PRESET_MENU_TEMPLATES.slice(0, 4).map((tmpl) => (
+              {orderedTemplates.slice(0, 4).map((tmpl) => (
                 <div 
                   key={tmpl.id}
                   onClick={() => handleApplyTemplate(tmpl)}

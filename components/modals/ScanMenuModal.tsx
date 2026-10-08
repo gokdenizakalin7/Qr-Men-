@@ -260,15 +260,9 @@ export function ScanMenuModal({ isOpen, onClose, onMenuCreated }: ScanMenuModalP
 
   // Menüyü Oluştur
   const createMenu = async (finalMenuName: string, finalCategories: ParsedCategory[]) => {
-    let coverUrl = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=400&fit=crop'
-    if (photos[0]?.file) {
-      try {
-        const compressedCover = await compressImageFile(photos[0].file, IMAGE_PRESETS.MENU_COVER)
-        coverUrl = compressedCover.dataUrl
-      } catch {
-        coverUrl = photos[0]?.preview || coverUrl
-      }
-    }
+    // Taranan kağıt menü fotoğrafı müşteri sayfasında kapak olmamalı (ve veritabanına base64 yazılmamalı).
+    // Kapak, işletme profilindeki kapak/tür görselinden gelir.
+    const coverUrl = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=400&fit=crop'
 
     const categories: MenuCategory[] = finalCategories
       .filter(cat => cat.items.length > 0)

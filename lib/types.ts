@@ -115,6 +115,9 @@ export interface Restaurant {
   ownerName?: string
   activationToken?: string
   createdAt?: string
+  businessType?: string
+  onboardingStep?: string
+  onboardingCompletedAt?: string | null
   tables?: any[]
   credentials?: {
     email: string

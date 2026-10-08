@@ -74,9 +74,15 @@ export function LandingPage() {
             >
               Restoranlar
             </Link>
+            <Link
+              to="/login"
+              className="text-sm font-semibold text-white/70 hover:text-white transition-colors"
+            >
+              Giriş Yap
+            </Link>
             <Button size="sm" className="bg-white text-black hover:bg-white/90 rounded-full px-6 font-bold" asChild>
-              <Link to="/login">
-                Giriş Yap
+              <Link to="/signup">
+                Ücretsiz Başla
               </Link>
             </Button>
           </nav>
@@ -106,7 +112,7 @@ export function LandingPage() {
                 
                 <div className="flex flex-col sm:flex-row gap-4 pt-8 justify-center items-center">
                   <Button size="lg" className="h-14 px-8 rounded-full bg-white text-black hover:bg-gray-200 font-bold text-lg shadow-[0_0_30px_rgba(255,255,255,0.3)] transition-all hover:scale-105" asChild>
-                    <Link to="/login">
+                    <Link to="/signup">
                       Hemen Başlayın <ArrowRight className="ml-2 h-5 w-5" />
                     </Link>
                   </Button>

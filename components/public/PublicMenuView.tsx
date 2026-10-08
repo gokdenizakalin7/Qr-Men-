@@ -34,6 +34,9 @@ import { PublicTermsOfServiceModal } from '@/components/modals/PublicTermsOfServ
 import { PublicPrivacyPolicyModal } from '@/components/modals/PublicPrivacyPolicyModal'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Menu, MenuItem, ProductTag } from '@/lib/types'
+import { getBusinessType } from '@/lib/business-types'
+
+const FALLBACK_COVER = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&h=600&fit=crop'
 
 // ÇOKLU DİL SÖZLÜĞÜ (TR, EN, AR, RU)
 const TRANSLATIONS = {
@@ -53,6 +56,9 @@ const TRANSLATIONS = {
     chefChoice: 'Şefin Tavsiyesi',
     table: 'Masa',
     noItemsFound: 'Aramanıza uygun ürün bulunamadı.',
+    hours: 'Çalışma Saatleri',
+    instagram: 'Instagram',
+    call: 'Ara',
     getDirections: 'Yol Tarifi Al',
     whatsappChat: 'WhatsApp',
     close: 'Kapat'
@@ -73,6 +79,9 @@ const TRANSLATIONS = {
     chefChoice: 'Chef\'s Choice',
     table: 'Table',
     noItemsFound: 'No items found matching your search.',
+    hours: 'Opening Hours',
+    instagram: 'Instagram',
+    call: 'Call',
     getDirections: 'Get Directions',
     whatsappChat: 'WhatsApp',
     close: 'Close'
@@ -93,6 +102,9 @@ const TRANSLATIONS = {
     chefChoice: 'اختيار الشيف',
     table: 'طاولة',
     noItemsFound: 'لم يتم العثور على أطباق مطابقة.',
+    hours: 'ساعات العمل',
+    instagram: 'انستغرام',
+    call: 'اتصال',
     getDirections: 'الاتجاهات',
     whatsappChat: 'واتساب',
     close: 'إغلاق'
@@ -113,6 +125,9 @@ const TRANSLATIONS = {
     chefChoice: 'Выбор шефа',
     table: 'Стол',
     noItemsFound: 'Блюда не найдены.',
+    hours: 'Часы работы',
+    instagram: 'Instagram',
+    call: 'Позвонить',
     getDirections: 'Маршрут',
     whatsappChat: 'WhatsApp',
     close: 'Закрыть'
@@ -141,7 +156,7 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
   const [previewMenu, setPreviewMenu] = useState<Menu | null>(null)
   const [previewPrimary, setPreviewPrimary] = useState<string | null>(null)
 
-  const targetSubdomain = restaurantSubdomain || paramSubdomain || 'lezzet-ocakbasi'
+  const targetSubdomain = restaurantSubdomain || paramSubdomain || ''
 
   const [restaurant, setRestaurant] = useState<any>(null)
   const [restaurantError, setRestaurantError] = useState(false)
@@ -333,6 +348,15 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
     }
   }
 
+  const businessType = getBusinessType(restaurant?.business_type)
+  const igHandle: string = restaurant?.instagram_handle || ''
+  const infoLinks = [
+    igHandle && { key: 'ig', href: `https://instagram.com/${igHandle}`, icon: <Instagram className="h-4 w-4" />, label: t.instagram },
+    restaurant?.whatsapp_number && { key: 'wa', href: `https://wa.me/${restaurant.whatsapp_number}`, icon: <MessageCircle className="h-4 w-4" />, label: t.whatsappChat },
+    (restaurant?.google_maps_url || restaurant?.address) && { key: 'map', href: restaurant?.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${restaurant?.name || ''} ${restaurant?.address || ''} ${restaurant?.city || ''}`)}`, icon: <Navigation className="h-4 w-4" />, label: t.getDirections },
+    restaurant?.business_phone && { key: 'tel', href: `tel:${String(restaurant.business_phone).replace(/\s/g, '')}`, icon: <Phone className="h-4 w-4" />, label: t.call },
+  ].filter(Boolean) as { key: string; href: string; icon: React.ReactNode; label: string }[]
+
   const copyWifi = () => {
     if (restaurant?.wifi_password) {
       navigator.clipboard.writeText(restaurant.wifi_password)
@@ -370,13 +394,13 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
     >
       <div className="relative z-10">
         {/* Dergi Tarzı Minimalist Kapak */}
-        {activeMenu && (
+        {(
           <div className="relative h-72 sm:h-[450px] w-full bg-[#1c1c1e] overflow-hidden rounded-b-[48px] shadow-[0_20px_50px_rgba(0,0,0,0.1)]">
             <motion.img 
               initial={{ scale: 1.1, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               transition={{ duration: 1.5, ease: "easeOut" }}
-              src={restaurant?.cover_url || activeMenu?.image_url} 
+              src={restaurant?.cover_url || businessType?.coverImage || FALLBACK_COVER} 
               alt={restaurant?.name}
               className="w-full h-full object-cover opacity-50" 
             />
@@ -387,9 +411,19 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
                 transition={{ delay: 0.3, duration: 0.8 }}
                 className="max-w-2xl"
               >
+                {restaurant?.logo_url ? (
+                  <img src={restaurant.logo_url} alt={restaurant?.name} className="h-20 w-20 sm:h-24 sm:w-24 rounded-3xl bg-white object-contain p-1.5 shadow-xl mb-4" />
+                ) : (
+                  <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-3xl flex items-center justify-center text-2xl sm:text-3xl font-black text-white shadow-xl mb-4" style={{ backgroundColor: primaryColor }}>
+                    {(restaurant?.name || '?').trim().slice(0, 2).toUpperCase()}
+                  </div>
+                )}
                 <h2 className="text-4xl sm:text-6xl font-black tracking-tighter text-white leading-none mb-3">
                   {restaurant?.name}
                 </h2>
+                {businessType && (
+                  <p className="text-xs sm:text-sm text-white/80 font-semibold mb-2">{businessType.icon} {businessType.label}</p>
+                )}
                 {restaurant?.address && (
                   <p className="text-sm sm:text-base text-white/90 font-medium flex items-center">
                     <MapPin className="h-4 w-4 mr-2" style={{ color: primaryColor }} /> {restaurant.address} {restaurant.city && `- ${restaurant.city}`}
@@ -428,7 +462,47 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
 
         <main className="container mx-auto px-4 py-8 max-w-5xl space-y-12 mb-24">
           
-          {/* HIZLI SOSYAL MEDYA BARİ (Kaldirildi, mock veriye dayaliydi) */}
+          {/* Bilgi şeridi: yalnızca doldurulmuş alanlar */}
+          {(infoLinks.length > 0 || restaurant?.working_hours) && (
+            <div className="flex flex-col items-center gap-3">
+              {infoLinks.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-2">
+                  {infoLinks.map((l) => (
+                    <a key={l.key} href={l.href} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-2 rounded-full bg-white dark:bg-[#2c2c2e] px-4 py-2.5 text-xs font-bold text-gray-800 dark:text-zinc-100 shadow-sm border border-gray-100 dark:border-white/5 hover:shadow-md transition-shadow">
+                      <span style={{ color: primaryColor }}>{l.icon}</span>{l.label}
+                    </a>
+                  ))}
+                </div>
+              )}
+              {restaurant?.working_hours && (
+                <p className="text-xs font-semibold text-gray-500 dark:text-zinc-400 text-center whitespace-pre-line">
+                  <span className="font-black">{t.hours}:</span> {restaurant.working_hours}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Wi-Fi kartı */}
+          {restaurant?.wifi_name && (
+            <div className="mx-auto w-full max-w-md rounded-3xl bg-white dark:bg-[#2c2c2e] p-4 shadow-sm border border-gray-100 dark:border-white/5 flex items-center gap-3">
+              <div className="h-11 w-11 shrink-0 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${primaryColor}1a`, color: primaryColor }}>
+                <Wifi className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{t.wifiTitle}</p>
+                <p className="truncate text-sm font-black text-gray-900 dark:text-zinc-100">{restaurant.wifi_name}</p>
+                {restaurant.wifi_password && <p className="truncate text-xs font-mono text-gray-500 dark:text-zinc-400">{restaurant.wifi_password}</p>}
+              </div>
+              {restaurant.wifi_password && (
+                <button onClick={copyWifi} className="shrink-0 flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold text-white" style={{ backgroundColor: primaryColor }}>
+                  {wifiCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                  {wifiCopied ? t.copied : t.copyWifi}
+                </button>
+              )}
+            </div>
+          )}
+
 
 
 
@@ -581,6 +655,32 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
             )}
           </div>
 
+          {/* Değerlendirme kartı */}
+          {restaurant?.google_review_url && (
+            <div className="mx-auto w-full max-w-md rounded-3xl bg-white dark:bg-[#2c2c2e] p-5 text-center shadow-sm border border-gray-100 dark:border-white/5">
+              <p className="text-sm font-black text-gray-900 dark:text-zinc-100">{t.rateUs}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-400 mb-3">{t.rateDesc}</p>
+              <div className="flex justify-center gap-1.5 mb-2">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button key={n} onClick={() => setRatingStars(n)} aria-label={`${n}`}>
+                    <Star className="h-8 w-8" style={{ color: '#f59e0b', fill: n <= ratingStars ? '#f59e0b' : 'transparent' }} />
+                  </button>
+                ))}
+              </div>
+              {ratingStars >= 4 && (
+                <div className="space-y-3 pt-1">
+                  <p className="text-xs text-gray-600 dark:text-zinc-300">{t.rateHighThanks}</p>
+                  <a href={restaurant.google_review_url} target="_blank" rel="noopener noreferrer"
+                    className="inline-block rounded-full px-5 py-2.5 text-xs font-bold text-white" style={{ backgroundColor: primaryColor }}>
+                    {t.googleReviewBtn}
+                  </a>
+                </div>
+              )}
+              {ratingStars > 0 && ratingStars <= 3 && (
+                <p className="text-xs text-gray-600 dark:text-zinc-300 pt-1">{t.rateLowThanks}</p>
+              )}
+            </div>
+          )}
 
         </main>
       </div>
@@ -696,7 +796,7 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
       {/* Footer */}
       <footer className="bg-white dark:bg-[#2c2c2e] border-t py-4 text-center text-xs text-gray-500 dark:text-zinc-500 space-y-2 mt-auto">
         <div className="container mx-auto px-4">
-          <p>© {new Date().getFullYear()} {restaurant.name} • Powered by <strong>QR Chef</strong></p>
+          <p className="flex items-center justify-center gap-1.5">{restaurant.logo_url && <img src={restaurant.logo_url} alt="" className="h-4 w-4 rounded object-contain" />}© {new Date().getFullYear()} {restaurant.name} • Powered by <strong>QR Chef</strong></p>
           <div className="flex justify-center space-x-4 mt-1.5 text-[11px]">
             <button onClick={() => setIsTermsOpen(true)} className="hover:underline text-gray-400 dark:text-zinc-500">
               Kullanım Koşulları

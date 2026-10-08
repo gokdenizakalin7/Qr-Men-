@@ -17,7 +17,7 @@ export function Sidebar({
 }: { 
   isSidebarOpen: boolean; 
   setIsSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>; 
-  userInfo: { name: string; email: string };
+  userInfo: { name: string; email: string; logoUrl?: string };
   userRole?: string;
 }) {
   const location = useLocation()
@@ -112,7 +112,7 @@ export function Sidebar({
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-auto w-full justify-start rounded-2xl border border-border/60 bg-card/60 p-2.5 backdrop-blur-xl hover:bg-accent dark:border-white/10 dark:bg-white/5">
               <Avatar className="mr-3 h-10 w-10 border-2 border-border">
-                <AvatarImage src="" alt={userInfo.name} />
+                <AvatarImage src={userInfo.logoUrl || ""} alt={userInfo.name} className="object-contain bg-white" />
                 <AvatarFallback className="bg-primary/10 font-bold text-foreground">
                   {userInfo.name.slice(0, 2).toUpperCase()}
                 </AvatarFallback>

@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Restaurant } from '@/lib/types'
+import { useRestaurant } from '@/components/providers/RestaurantProvider'
 import { 
   QrCode, 
   Download, 
@@ -33,15 +34,13 @@ export interface TableItem {
 }
 
 export function QRCodesContent() {
-  const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant | null>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('currentRestaurant')
-      if (stored) return JSON.parse(stored)
-    }
-    return null
-  })
+  const { restaurant: currentRestaurant } = useRestaurant()
+  const logoUrl = currentRestaurant?.branding?.logoUrl || ''
+  const qrLevel = logoUrl ? 'H' : 'M'
+  const logoImage = (size: number) =>
+    logoUrl ? { src: logoUrl, height: Math.round(size * 0.22), width: Math.round(size * 0.22), excavate: true } : undefined
 
-  const subdomain = currentRestaurant?.subdomain || 'lezzet-ocakbasi'
+  const subdomain = currentRestaurant?.subdomain || ''
   const primaryColor = currentRestaurant?.branding?.primaryColor || '#e11d48'
   const wifiName = currentRestaurant?.businessInfo?.wifi_name || ''
   const wifiPass = currentRestaurant?.businessInfo?.wifi_password || ''
@@ -176,7 +175,8 @@ export function QRCodesContent() {
               <QRCodeSVG 
                 value={getTableLink('Genel Menü')}
                 size={112}
-                level="M"
+                level={qrLevel}
+                    imageSettings={logoImage(112)}
                 includeMargin={false}
               />
             </div>
@@ -184,7 +184,7 @@ export function QRCodesContent() {
               <span className="text-[11px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">
                 Genel Mekan QR Kodu
               </span>
-              <h2 className="text-lg font-extrabold text-foreground">{currentRestaurant.name}</h2>
+              <h2 className="text-lg font-extrabold text-foreground">{currentRestaurant?.name}</h2>
               <p className="text-xs text-muted-foreground max-w-md">
                 Sosyal medya bio'nuzda, broşürlerinizde veya restoran giriş kapısında kullanabileceğiniz genel dijital menü bağlantınızdır.
               </p>
@@ -424,7 +424,7 @@ export function QRCodesContent() {
                 {/* Üst Logo & Restoran Adı */}
                 <div className="space-y-1">
                   <h3 className="font-black text-base tracking-tight text-foreground uppercase">
-                    {currentRestaurant.name}
+                    {currentRestaurant?.name}
                   </h3>
                   <div 
                     className="inline-block px-3 py-0.5 rounded-full text-white text-[11px] font-extrabold shadow-xs"
@@ -439,7 +439,8 @@ export function QRCodesContent() {
                   <QRCodeSVG 
                     value={getTableLink(activePrintTable?.name || '')}
                     size={152}
-                    level="Q"
+                    level={qrLevel}
+                    imageSettings={logoImage(152)}
                     includeMargin={false}
                   />
                 </div>
@@ -478,7 +479,7 @@ export function QRCodesContent() {
                 style={{ borderColor: primaryColor }}
               >
                 <div className="flex items-center justify-between w-full px-2">
-                  <span className="font-extrabold text-xs truncate max-w-[150px]">{currentRestaurant.name}</span>
+                  <span className="font-extrabold text-xs truncate max-w-[150px]">{currentRestaurant?.name}</span>
                   <span 
                     className="text-[10px] text-white px-2 py-0.5 rounded-full font-bold"
                     style={{ backgroundColor: primaryColor }}
@@ -491,7 +492,8 @@ export function QRCodesContent() {
                   <QRCodeSVG 
                     value={getTableLink(activePrintTable?.name || '')}
                     size={128}
-                    level="Q"
+                    level={qrLevel}
+                    imageSettings={logoImage(128)}
                     includeMargin={false}
                   />
                 </div>
@@ -506,7 +508,7 @@ export function QRCodesContent() {
             {selectedTemplate === 'bulk_a4' && (
               <div className="keep-light bg-white w-full max-w-[700px] p-6 rounded-xl shadow-lg border text-gray-900 space-y-4">
                 <div className="text-center border-b pb-2">
-                  <h3 className="font-black text-lg text-foreground">{currentRestaurant.name}</h3>
+                  <h3 className="font-black text-lg text-foreground">{currentRestaurant?.name}</h3>
                   <p className="text-xs text-muted-foreground">Masa Standı & QR Kod Çıktı Tablosu (A4)</p>
                 </div>
 
@@ -527,7 +529,8 @@ export function QRCodesContent() {
                         <QRCodeSVG 
                           value={getTableLink(tbl.name)}
                           size={88}
-                          level="M"
+                          level={qrLevel}
+                    imageSettings={logoImage(88)}
                           includeMargin={false}
                         />
                       </div>

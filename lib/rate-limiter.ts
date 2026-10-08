@@ -179,6 +179,10 @@ export const RATE_LIMITS = {
   CALORIE_PER_ITEM: { limit: 2, windowSeconds: 86400 },
   // Giriş Yapma: 15 dakikada en fazla 5 deneme (Brute-force koruması)
   AUTH_LOGIN: { limit: 5, windowSeconds: 900 },
+  // Kayıt: IP başına saatte en fazla 5 hesap
+  AUTH_SIGNUP: { limit: 5, windowSeconds: 3600 },
+  // Logo/kapak yükleme: kullanıcı başına 10 dakikada 20
+  ASSET_UPLOAD: { limit: 20, windowSeconds: 600 },
   // Genel API rotaları: Dakikada en fazla 100 istek (DDoS & Scraping koruması)
   GENERAL_API: { limit: 100, windowSeconds: 60 }
 }
