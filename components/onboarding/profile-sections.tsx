@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { ImagePlus, Loader2, Trash2, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
@@ -280,14 +280,26 @@ export function ImageUploader({
 }
 
 export function BrandSection({ draft, setDraft }: SectionProps) {
+  const { restaurant } = useRestaurant()
+  const lastServerColorRef = useRef(restaurant?.branding?.primaryColor)
+
+  // Sunucu rengi değişince (ör. logo yüklemeden otomatik çıkarım) taslağı güncelle;
+  // kullanıcı düzenlerken draft ile karşılaştırma yapma — anında eski renge döner.
+  useEffect(() => {
+    const c = restaurant?.branding?.primaryColor
+    if (!c || c === lastServerColorRef.current) return
+    lastServerColorRef.current = c
+    setDraft((d) => ({ ...d, primaryColor: c }))
+  }, [restaurant?.branding?.primaryColor, setDraft])
+
   return (
     <div className="space-y-5">
-      <ImageUploader kind="logo" label="Logo" hint="Menünüzün üstünde, panelde ve QR kodların ortasında görünür. Şeffaf PNG önerilir." />
+      <ImageUploader kind="logo" label="Logo" hint="Menünüzün üstünde, panelde ve QR kodların ortasında görünür. Önerilen: 512×512 px, kare (1:1), şeffaf PNG. Logoyu kenarlardan biraz boşluk bırakarak ortalayın." />
       <ImageUploader
         kind="cover"
         label="Kapak Görseli"
         aspect="wide"
-        hint="Menünün üst bölümünde görünür. Yüklemezseniz işletme türünüze uygun hazır bir görsel kullanılır."
+        hint="Menünün üst bölümünde görünür. Önerilen: 1200×500 px (yatay, yaklaşık 12:5). Mobilde üst/alt kenarlar kırpılabilir; önemli kısımları ortada tutun, alt-sol köşe işletme adıyla kaplanır. Yüklemezseniz işletme türünüze uygun hazır bir görsel kullanılır."
       />
       <Field label="Ana Renk">
         <div className="flex items-center gap-3">

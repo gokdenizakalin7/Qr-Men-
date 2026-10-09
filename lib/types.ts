@@ -17,13 +17,23 @@ export interface UserAccount {
   activationToken?: string
 }
 
-export type ProductTag = 
-  | 'vegan' 
-  | 'vegetarian' 
-  | 'gluten_free' 
-  | 'spicy' 
-  | 'chef_choice' 
-  | 'popular' 
+export type ProductTag =
+  | 'hot'
+  | 'cold'
+  | 'caffeinated'
+  | 'decaf'
+  | 'alcoholic'
+  | 'vegan'
+  | 'vegetarian'
+  | 'gluten_free'
+  | 'dairy_free'
+  | 'sugar_free'
+  | 'spicy'
+  | 'kids'
+  | 'sharing'
+  | 'seasonal'
+  | 'popular'
+  | 'chef_choice'
   | 'discount'
 
 export interface ProductVariation {
@@ -57,6 +67,8 @@ export interface MenuCategory {
   id: string
   name: string
   description?: string
+  parent_id?: string | null
+  icon?: string | null
   display_order: number
   is_active: boolean
   items: MenuItem[]

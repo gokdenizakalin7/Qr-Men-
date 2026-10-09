@@ -13,7 +13,7 @@ async function getAccessToken(): Promise<string> {
 // Sayfa geçişlerinde aynı verinin tekrar tekrar çekilmesini önleyen kısa ömürlü GET önbelleği.
 // Aynı anda yapılan özdeş istekler de tek ağ isteğine indirilir.
 const GET_CACHE_TTL_MS = 30_000
-const CACHEABLE_PREFIXES = ['/api/auth/me', '/api/menus/load', '/api/tables/load']
+const CACHEABLE_PREFIXES = ['/api/auth/me', '/api/menus/load', '/api/tables/load', '/api/templates']
 const responseCache = new Map<string, { expires: number; promise: Promise<Response> }>()
 
 function isCacheable(url: string, options: RequestInit) {

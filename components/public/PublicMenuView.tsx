@@ -15,12 +15,7 @@ import {
   AlertCircle, 
   Flame, 
   Star, 
-  MapPin, 
-  Phone,
   Globe,
-  Navigation,
-  MessageCircle,
-  Instagram,
   Send,
   Sparkles,
   Moon,
@@ -33,6 +28,7 @@ import {
 import { PublicTermsOfServiceModal } from '@/components/modals/PublicTermsOfServiceModal'
 import { PublicPrivacyPolicyModal } from '@/components/modals/PublicPrivacyPolicyModal'
 import { motion, AnimatePresence } from 'framer-motion'
+import { flushSync } from 'react-dom'
 import type { Menu, MenuItem, ProductTag } from '@/lib/types'
 import { getBusinessType } from '@/lib/business-types'
 
@@ -57,10 +53,8 @@ const TRANSLATIONS = {
     table: 'Masa',
     noItemsFound: 'Aramanıza uygun ürün bulunamadı.',
     hours: 'Çalışma Saatleri',
-    instagram: 'Instagram',
-    call: 'Ara',
-    getDirections: 'Yol Tarifi Al',
-    whatsappChat: 'WhatsApp',
+    instagramShort: 'Instagram',
+    googleReviewShort: 'Yorum Yap',
     close: 'Kapat'
   },
   en: {
@@ -80,10 +74,8 @@ const TRANSLATIONS = {
     table: 'Table',
     noItemsFound: 'No items found matching your search.',
     hours: 'Opening Hours',
-    instagram: 'Instagram',
-    call: 'Call',
-    getDirections: 'Get Directions',
-    whatsappChat: 'WhatsApp',
+    instagramShort: 'Instagram',
+    googleReviewShort: 'Write a Review',
     close: 'Close'
   },
   ar: {
@@ -103,10 +95,8 @@ const TRANSLATIONS = {
     table: 'طاولة',
     noItemsFound: 'لم يتم العثور على أطباق مطابقة.',
     hours: 'ساعات العمل',
-    instagram: 'انستغرام',
-    call: 'اتصال',
-    getDirections: 'الاتجاهات',
-    whatsappChat: 'واتساب',
+    instagramShort: 'انستغرام',
+    googleReviewShort: 'اكتب تقييماً',
     close: 'إغلاق'
   },
   ru: {
@@ -126,10 +116,8 @@ const TRANSLATIONS = {
     table: 'Стол',
     noItemsFound: 'Блюда не найдены.',
     hours: 'Часы работы',
-    instagram: 'Instagram',
-    call: 'Позвонить',
-    getDirections: 'Маршрут',
-    whatsappChat: 'WhatsApp',
+    instagramShort: 'Instagram',
+    googleReviewShort: 'Оставить отзыв',
     close: 'Закрыть'
   }
 }
@@ -190,6 +178,34 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
       setIsDarkMode(isDark)
     }
   }, [])
+  // Yumuşak tema geçişi: butondan genişleyen dairesel açılma (View Transitions API)
+  const toggleTheme = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const next = !isDarkMode
+    const root = document.documentElement
+    const apply = () => {
+      flushSync(() => setIsDarkMode(next))
+      root.classList.toggle('dark', next)
+    }
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const start = (document as any).startViewTransition?.bind(document)
+    if (reduce || !start) {
+      root.classList.add('theme-fade')
+      apply()
+      setTimeout(() => root.classList.remove('theme-fade'), 600)
+      return
+    }
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = rect.left + rect.width / 2
+    const y = rect.top + rect.height / 2
+    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y))
+    const t = start(apply)
+    t.ready.then(() => {
+      root.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+        { duration: 900, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', pseudoElement: '::view-transition-new(root)' }
+      )
+    }).catch(() => {})
+  }
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark')
@@ -206,7 +222,6 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
   const [wifiCopied, setWifiCopied] = useState(false)
 
   // GOOGLE REVIEW & DEĞERLENDİRME STATE'LERİ
-  const [ratingStars, setRatingStars] = useState<number>(0)
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
   const [feedbackText, setFeedbackText] = useState('')
 
@@ -320,7 +335,7 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
           }
         })
       },
-      { rootMargin: '-120px 0px -75% 0px', threshold: 0.1 }
+      { rootMargin: '-96px 0px -75% 0px', threshold: 0.1 }
     )
 
     Object.values(categoryRefs.current).forEach((ref) => {
@@ -336,7 +351,7 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
     setActiveCategory(categoryId)
     const element = categoryRefs.current[categoryId]
     if (element) {
-      const yOffset = -120 // Header ve sticky nav yüksekliği
+      const yOffset = -96
       const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset
       window.scrollTo({ top: y, behavior: 'smooth' })
       
@@ -349,13 +364,6 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
   }
 
   const businessType = getBusinessType(restaurant?.business_type)
-  const igHandle: string = restaurant?.instagram_handle || ''
-  const infoLinks = [
-    igHandle && { key: 'ig', href: `https://instagram.com/${igHandle}`, icon: <Instagram className="h-4 w-4" />, label: t.instagram },
-    restaurant?.whatsapp_number && { key: 'wa', href: `https://wa.me/${restaurant.whatsapp_number}`, icon: <MessageCircle className="h-4 w-4" />, label: t.whatsappChat },
-    (restaurant?.google_maps_url || restaurant?.address) && { key: 'map', href: restaurant?.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${restaurant?.name || ''} ${restaurant?.address || ''} ${restaurant?.city || ''}`)}`, icon: <Navigation className="h-4 w-4" />, label: t.getDirections },
-    restaurant?.business_phone && { key: 'tel', href: `tel:${String(restaurant.business_phone).replace(/\s/g, '')}`, icon: <Phone className="h-4 w-4" />, label: t.call },
-  ].filter(Boolean) as { key: string; href: string; icon: React.ReactNode; label: string }[]
 
   const copyWifi = () => {
     if (restaurant?.wifi_password) {
@@ -384,6 +392,16 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
     )
   }
 
+  const hasCustomCover = Boolean(restaurant.cover_url?.trim())
+  const coverUsesLogo = !hasCustomCover && Boolean(restaurant.logo_url?.trim())
+  const heroCoverSrc = hasCustomCover
+    ? restaurant.cover_url!
+    : coverUsesLogo
+      ? restaurant.logo_url!
+      : businessType?.coverImage || FALLBACK_COVER
+  const igHandle = (restaurant.instagram_handle || '').replace(/^@+/, '')
+  const showSocialCards = Boolean(igHandle || restaurant.google_review_url)
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -395,60 +413,56 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
       <div className="relative z-10">
         {/* Dergi Tarzı Minimalist Kapak */}
         {(
-          <div className="relative h-72 sm:h-[450px] w-full bg-[#1c1c1e] overflow-hidden rounded-b-[48px] shadow-[0_20px_50px_rgba(0,0,0,0.1)]">
+          <div className="relative h-40 sm:h-52 w-full bg-[#e9e9ee] dark:bg-[#1c1c1e] overflow-hidden rounded-b-[28px] shadow-[0_12px_32px_rgba(0,0,0,0.08)]">
             <motion.img 
-              initial={{ scale: 1.1, y: 20 }}
+              initial={{ scale: 1.05, y: 10 }}
               animate={{ scale: 1, y: 0 }}
-              transition={{ duration: 1.5, ease: "easeOut" }}
-              src={restaurant?.cover_url || businessType?.coverImage || FALLBACK_COVER} 
-              alt={restaurant?.name}
-              className="w-full h-full object-cover opacity-50" 
+              transition={{ duration: 1.2, ease: "easeOut" }}
+              src={heroCoverSrc} 
+              alt={restaurant.name}
+              className={`w-full h-full ${coverUsesLogo ? 'object-contain scale-125 opacity-60 dark:opacity-35 blur-[1px]' : 'object-cover opacity-90 dark:opacity-45'}`}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-6 sm:p-12">
+            <div className="absolute inset-0 bg-gradient-to-t from-white/90 via-white/40 to-white/5 dark:from-black/85 dark:via-black/35 dark:to-black/10 flex flex-col justify-end p-4 sm:p-6">
               <motion.div
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, duration: 0.8 }}
+                transition={{ delay: 0.2, duration: 0.6 }}
                 className="max-w-2xl"
               >
-                {restaurant?.logo_url ? (
-                  <img src={restaurant.logo_url} alt={restaurant?.name} className="h-20 w-20 sm:h-24 sm:w-24 rounded-3xl bg-white object-contain p-1.5 shadow-xl mb-4" />
-                ) : (
-                  <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-3xl flex items-center justify-center text-2xl sm:text-3xl font-black text-white shadow-xl mb-4" style={{ backgroundColor: primaryColor }}>
-                    {(restaurant?.name || '?').trim().slice(0, 2).toUpperCase()}
-                  </div>
-                )}
-                <h2 className="text-4xl sm:text-6xl font-black tracking-tighter text-white leading-none mb-3">
-                  {restaurant?.name}
+                <h2 className="text-2xl sm:text-4xl font-black tracking-tight text-gray-900 dark:text-white leading-tight">
+                  {restaurant.name}
                 </h2>
-                {businessType && (
-                  <p className="text-xs sm:text-sm text-white/80 font-semibold mb-2">{businessType.icon} {businessType.label}</p>
-                )}
-                {restaurant?.address && (
-                  <p className="text-sm sm:text-base text-white/90 font-medium flex items-center">
-                    <MapPin className="h-4 w-4 mr-2" style={{ color: primaryColor }} /> {restaurant.address} {restaurant.city && `- ${restaurant.city}`}
-                  </p>
-                )}
               </motion.div>
             </div>
 
             {/* Sağ üst şık dil seçici & Gece Modu Butonu */}
-            <div className="absolute top-6 right-6 flex items-center gap-2 z-50">
+            <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-1.5 z-50">
               {/* Gece Modu Butonu */}
               <button
-                onClick={() => setIsDarkMode(!isDarkMode)}
-                className="flex items-center justify-center w-8 h-8 bg-black/20 backdrop-blur-xl rounded-full border border-white/10 text-white/80 hover:text-white transition-colors"
+                onClick={toggleTheme}
+                className="flex items-center justify-center w-8 h-8 bg-white/70 dark:bg-black/20 backdrop-blur-xl rounded-full border border-black/10 dark:border-white/10 text-gray-700 dark:text-white/80 hover:text-black dark:hover:text-white transition-colors"
                 aria-label="Toggle Dark Mode"
               >
-                {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={isDarkMode ? 'sun' : 'moon'}
+                    initial={{ rotate: -90, scale: 0.5, opacity: 0 }}
+                    animate={{ rotate: 0, scale: 1, opacity: 1 }}
+                    exit={{ rotate: 90, scale: 0.5, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: 'easeOut' }}
+                    className="flex"
+                  >
+                    {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  </motion.span>
+                </AnimatePresence>
               </button>
 
-              <div className="flex items-center bg-black/20 backdrop-blur-xl px-3 py-1.5 rounded-full border border-white/10">
-                <Globe className="h-4 w-4 text-white/80 mr-1.5" />
+              <div className="flex items-center bg-white/70 dark:bg-black/20 backdrop-blur-xl px-3 py-1.5 rounded-full border border-black/10 dark:border-white/10">
+                <Globe className="h-4 w-4 text-gray-700 dark:text-white/80 mr-1.5" />
                 <select
                   value={lang}
                   onChange={(e) => setLang(e.target.value as 'tr' | 'en' | 'ar' | 'ru')}
-                  className="text-xs bg-transparent font-bold text-white focus:outline-none cursor-pointer appearance-none uppercase"
+                  className="text-xs bg-transparent font-bold text-gray-900 dark:text-white focus:outline-none cursor-pointer appearance-none uppercase"
                 >
                   <option value="tr" className="text-black">TR</option>
                   <option value="en" className="text-black">EN</option>
@@ -460,69 +474,117 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
           </div>
         )}
 
-        <main className="container mx-auto px-4 py-8 max-w-5xl space-y-12 mb-24">
-          
-          {/* Bilgi şeridi: yalnızca doldurulmuş alanlar */}
-          {(infoLinks.length > 0 || restaurant?.working_hours) && (
-            <div className="flex flex-col items-center gap-3">
-              {infoLinks.length > 0 && (
-                <div className="flex flex-wrap justify-center gap-2">
-                  {infoLinks.map((l) => (
-                    <a key={l.key} href={l.href} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-2 rounded-full bg-white dark:bg-[#2c2c2e] px-4 py-2.5 text-xs font-bold text-gray-800 dark:text-zinc-100 shadow-sm border border-gray-100 dark:border-white/5 hover:shadow-md transition-shadow">
-                      <span style={{ color: primaryColor }}>{l.icon}</span>{l.label}
-                    </a>
-                  ))}
+        {showSocialCards && (
+          <div
+            className="bg-white dark:bg-[#242427] border border-gray-200 dark:border-[#333336] shadow-sm dark:shadow-none"
+            style={{
+              margin: '20px 16px 0',
+              borderRadius: 18,
+              display: 'grid',
+              gridTemplateColumns: igHandle && restaurant.google_review_url ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1fr)',
+              overflow: 'hidden',
+              containerType: 'inline-size',
+            }}
+          >
+            {igHandle && (
+              <a
+                href={`https://instagram.com/${igHandle}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={restaurant.google_review_url ? 'border-r border-gray-200 dark:border-[#333336]' : undefined}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  gap: 'clamp(6px, 2.6cqw, 10px)',
+                  padding: '12px clamp(8px, 3.2cqw, 14px)',
+                  minWidth: 0,
+                }}
+              >
+                <div style={{ width: 'clamp(26px, 9cqw, 34px)', height: 'clamp(26px, 9cqw, 34px)', flexShrink: 0, borderRadius: '50%', background: 'rgba(240,90,140,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg style={{ width: '52%', height: '52%' }} viewBox="0 0 24 24" fill="none" stroke="#F27BA6" strokeWidth="1.9">
+                    <rect x="3" y="3" width="18" height="18" rx="5" />
+                    <circle cx="12" cy="12" r="4" />
+                    <circle cx="17.3" cy="6.7" r="0.6" fill="#F27BA6" />
+                  </svg>
                 </div>
-              )}
-              {restaurant?.working_hours && (
-                <p className="text-xs font-semibold text-gray-500 dark:text-zinc-400 text-center whitespace-pre-line">
-                  <span className="font-black">{t.hours}:</span> {restaurant.working_hours}
-                </p>
-              )}
-            </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+                  <span className="text-gray-500 dark:text-[#a1a1a6]" style={{ fontSize: 'clamp(10px, 3cqw, 11px)', whiteSpace: 'nowrap' }}>{t.instagramShort}</span>
+                  <span className="text-gray-900 dark:text-white" style={{ fontSize: 'clamp(11px, 3.7cqw, 14px)', fontWeight: 700, lineHeight: 1.2, overflowWrap: 'anywhere' }}>@{igHandle}</span>
+                </div>
+              </a>
+            )}
+            {restaurant.google_review_url && (
+              <a
+                href={restaurant.google_review_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  gap: 'clamp(6px, 2.6cqw, 10px)',
+                  padding: '12px clamp(8px, 3.2cqw, 14px)',
+                  minWidth: 0,
+                }}
+              >
+                <div style={{ width: 'clamp(26px, 9cqw, 34px)', height: 'clamp(26px, 9cqw, 34px)', flexShrink: 0, borderRadius: '50%', background: 'rgba(251,188,4,0.13)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg style={{ width: '52%', height: '52%' }} viewBox="0 0 24 24" fill="none" stroke="#F5C04A" strokeWidth="1.9" strokeLinejoin="round">
+                    <path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z" />
+                  </svg>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+                  <span className="text-gray-500 dark:text-[#a1a1a6]" style={{ fontSize: 'clamp(10px, 3cqw, 11px)', whiteSpace: 'nowrap' }}>Google</span>
+                  <span className="text-gray-900 dark:text-white" style={{ fontSize: 'clamp(11px, 3.7cqw, 14px)', fontWeight: 700, lineHeight: 1.2, overflowWrap: 'anywhere' }}>{t.googleReviewShort}</span>
+                </div>
+              </a>
+            )}
+          </div>
+        )}
+
+        <main className="container mx-auto px-4 py-4 sm:py-5 max-w-5xl space-y-4 sm:space-y-5 mb-24">
+
+          {restaurant.working_hours && (
+            <p className="text-[10px] sm:text-[11px] font-medium text-gray-500 dark:text-zinc-400 text-center whitespace-pre-line -mt-1">
+              <span className="font-bold text-gray-600 dark:text-zinc-300">{t.hours}:</span> {restaurant.working_hours}
+            </p>
           )}
 
-          {/* Wi-Fi kartı */}
-          {restaurant?.wifi_name && (
-            <div className="mx-auto w-full max-w-md rounded-3xl bg-white dark:bg-[#2c2c2e] p-4 shadow-sm border border-gray-100 dark:border-white/5 flex items-center gap-3">
-              <div className="h-11 w-11 shrink-0 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${primaryColor}1a`, color: primaryColor }}>
-                <Wifi className="h-5 w-5" />
+          {restaurant.wifi_name && (
+            <div className="mx-auto w-full max-w-sm rounded-xl bg-white dark:bg-[#2c2c2e] px-2.5 py-2 shadow-sm border border-gray-100 dark:border-white/5 flex items-center gap-2">
+              <div className="h-7 w-7 shrink-0 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${primaryColor}1a`, color: primaryColor }}>
+                <Wifi className="h-3.5 w-3.5" />
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{t.wifiTitle}</p>
-                <p className="truncate text-sm font-black text-gray-900 dark:text-zinc-100">{restaurant.wifi_name}</p>
-                {restaurant.wifi_password && <p className="truncate text-xs font-mono text-gray-500 dark:text-zinc-400">{restaurant.wifi_password}</p>}
+              <div className="min-w-0 flex-1 leading-tight">
+                <p className="truncate text-[11px] font-bold text-gray-900 dark:text-zinc-100">{restaurant.wifi_name}</p>
+                {restaurant.wifi_password && <p className="truncate text-[10px] font-mono text-gray-500 dark:text-zinc-400">{restaurant.wifi_password}</p>}
               </div>
               {restaurant.wifi_password && (
-                <button onClick={copyWifi} className="shrink-0 flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold text-white" style={{ backgroundColor: primaryColor }}>
-                  {wifiCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                <button onClick={copyWifi} className="shrink-0 flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold text-white" style={{ backgroundColor: primaryColor }}>
+                  {wifiCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                   {wifiCopied ? t.copied : t.copyWifi}
                 </button>
               )}
             </div>
           )}
 
-
-
-
-          {/* Arama Çubuğu */}
           <div className="relative w-full max-w-md mx-auto">
-            <Search className="absolute left-5 top-4 h-5 w-5 text-gray-400 dark:text-zinc-500" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-zinc-500" />
             <input
               placeholder={t.searchPlaceholder}
-              className="w-full pl-14 pr-6 h-14 text-sm bg-white dark:bg-[#2c2c2e]/60 backdrop-blur-xl rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/40 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-gray-400 dark:text-zinc-500 font-medium"
+              className="w-full pl-10 pr-4 h-10 text-sm bg-white dark:bg-[#2c2c2e]/60 backdrop-blur-xl rounded-full shadow-[0_4px_16px_rgb(0,0,0,0.05)] border border-gray-100/80 dark:border-white/5 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-gray-400 dark:text-zinc-200 font-medium"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
-          {/* STICKY KATEGORİ MENÜSÜ */}
           {filteredCategories.length > 0 && (
-            <div className="sticky top-0 z-40 w-[calc(100%+2rem)] -mx-4 px-4 py-3 bg-[#F5F5F7]/95 dark:bg-[#1c1c1e]/95 backdrop-blur-xl sm:w-full sm:mx-0 sm:px-0 border-b border-gray-200/50 dark:border-white/5 shadow-sm">
+            <div className="sticky top-0 z-40 w-[calc(100%+2rem)] -mx-4 px-4 py-2 bg-[#F5F5F7]/95 dark:bg-[#1c1c1e]/95 backdrop-blur-xl sm:w-full sm:mx-0 sm:px-0 border-b border-gray-200/50 dark:border-white/5">
               <div 
                 ref={tabsContainerRef}
-                className="flex gap-2 overflow-x-auto hide-scrollbar pb-1 scroll-smooth"
+                className="flex gap-1.5 overflow-x-auto hide-scrollbar scroll-smooth"
               >
                 {filteredCategories.map(cat => (
                   <button
@@ -530,10 +592,10 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
                     data-category={cat.id}
                     onClick={() => scrollToCategory(cat.id)}
                     className={`
-                      px-5 py-2.5 rounded-full font-bold text-[13px] whitespace-nowrap transition-all shadow-sm border
+                      px-3.5 py-1.5 rounded-full font-semibold text-xs whitespace-nowrap transition-all border
                       ${activeCategory === cat.id 
                         ? 'bg-gray-900 text-white border-transparent dark:bg-white dark:text-gray-900' 
-                        : 'bg-white dark:bg-[#2c2c2e] text-gray-600 dark:text-zinc-300 border-transparent hover:bg-gray-50 dark:hover:bg-[#3a3a3c]'}
+                        : 'bg-white/80 dark:bg-[#2c2c2e] text-gray-600 dark:text-zinc-300 border-gray-100/80 dark:border-white/5 hover:bg-white dark:hover:bg-[#3a3a3c]'}
                     `}
                   >
                     {cat.name}
@@ -544,7 +606,7 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
           )}
 
           {/* Dergi Bento Izgarası */}
-          <div className="space-y-16 pt-4 pb-12">
+          <div className="space-y-10 pt-2 pb-12">
             {!activeMenu || filteredCategories.length === 0 ? (
               <div className="text-center py-20 bg-white dark:bg-[#2c2c2e] rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] text-gray-400 dark:text-zinc-500 text-base font-medium">
                 <Utensils className="h-10 w-10 mx-auto mb-3 opacity-20" />
@@ -556,13 +618,13 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
                   key={category.id} 
                   id={category.id}
                   ref={(el) => { categoryRefs.current[category.id] = el; }}
-                  className="space-y-5 scroll-mt-36"
+                  className="space-y-3 scroll-mt-28"
                 >
-                  <div className="mb-6 flex items-end justify-between">
+                  <div className="mb-2 flex items-end justify-between border-b border-gray-200/60 dark:border-white/10 pb-2">
                     <div>
-                      <h3 className="font-black text-4xl text-gray-900 dark:text-zinc-100 tracking-tighter capitalize">{category.name}</h3>
+                      <h3 className="font-bold text-lg sm:text-xl text-gray-900 dark:text-zinc-100 tracking-tight capitalize">{category.name}</h3>
                       {category.description && (
-                        <p className="text-base text-gray-500 dark:text-zinc-500 mt-2 font-medium max-w-lg">{category.description}</p>
+                        <p className="text-xs text-gray-500 dark:text-zinc-500 mt-0.5 font-medium max-w-lg line-clamp-2">{category.description}</p>
                       )}
                     </div>
                   </div>
@@ -614,16 +676,16 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
                           </div>
                           
                           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 mt-2 pt-2 sm:mt-3 sm:pt-3 border-t border-gray-900/5">
-                            <span className="font-black text-lg sm:text-xl shrink-0" style={{ color: primaryColor }}>
+                            <span className="font-black text-lg sm:text-xl shrink-0 text-gray-900 dark:text-white">
                               {item.price}
                             </span>
 
                             {/* Kalori ve Alerjenler */}
                             <div className="flex flex-wrap items-center gap-1.5 justify-end">
                               {item.allergens && item.allergens.length > 0 && (
-                                <div className="flex items-center gap-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded-full border border-red-100 dark:border-red-900/30">
-                                  <AlertCircle className="h-3 w-3 text-red-500" />
-                                  <span className="text-[9px] sm:text-[10px] font-bold text-red-600 dark:text-red-400">
+                                <div className="flex items-center gap-1 bg-gray-100 dark:bg-zinc-800 px-2 py-1 rounded-full border border-gray-200 dark:border-zinc-700">
+                                  <AlertCircle className="h-3 w-3 text-gray-500 dark:text-zinc-400" />
+                                  <span className="text-[9px] sm:text-[10px] font-bold text-gray-600 dark:text-zinc-300">
                                     {item.allergens.join(', ')}
                                   </span>
                                 </div>
@@ -654,33 +716,6 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
               ))
             )}
           </div>
-
-          {/* Değerlendirme kartı */}
-          {restaurant?.google_review_url && (
-            <div className="mx-auto w-full max-w-md rounded-3xl bg-white dark:bg-[#2c2c2e] p-5 text-center shadow-sm border border-gray-100 dark:border-white/5">
-              <p className="text-sm font-black text-gray-900 dark:text-zinc-100">{t.rateUs}</p>
-              <p className="text-xs text-gray-500 dark:text-zinc-400 mb-3">{t.rateDesc}</p>
-              <div className="flex justify-center gap-1.5 mb-2">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button key={n} onClick={() => setRatingStars(n)} aria-label={`${n}`}>
-                    <Star className="h-8 w-8" style={{ color: '#f59e0b', fill: n <= ratingStars ? '#f59e0b' : 'transparent' }} />
-                  </button>
-                ))}
-              </div>
-              {ratingStars >= 4 && (
-                <div className="space-y-3 pt-1">
-                  <p className="text-xs text-gray-600 dark:text-zinc-300">{t.rateHighThanks}</p>
-                  <a href={restaurant.google_review_url} target="_blank" rel="noopener noreferrer"
-                    className="inline-block rounded-full px-5 py-2.5 text-xs font-bold text-white" style={{ backgroundColor: primaryColor }}>
-                    {t.googleReviewBtn}
-                  </a>
-                </div>
-              )}
-              {ratingStars > 0 && ratingStars <= 3 && (
-                <p className="text-xs text-gray-600 dark:text-zinc-300 pt-1">{t.rateLowThanks}</p>
-              )}
-            </div>
-          )}
 
         </main>
       </div>
@@ -726,7 +761,7 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
                 <div className="flex justify-between items-start mb-4">
                   <h3 className="text-3xl font-black text-gray-900 dark:text-zinc-100 tracking-tight leading-tight pr-4">{selectedItem.name}</h3>
                   {selectedItem.price && (
-                    <span className="text-2xl font-black shrink-0" style={{ color: primaryColor }}>
+                    <span className="text-2xl font-black shrink-0 text-gray-900 dark:text-white">
                       {selectedItem.price}
                     </span>
                   )}
@@ -773,14 +808,14 @@ export function PublicMenuView({ restaurantSubdomain }: { restaurantSubdomain?: 
 
                 {/* Alerjenler */}
                 {selectedItem.allergens && selectedItem.allergens.length > 0 && (
-                  <div className="mt-2 bg-rose-50/50 rounded-2xl p-4 border border-rose-100/50">
-                    <h4 className="text-[11px] font-bold text-rose-800 uppercase tracking-wider mb-3 flex items-center">
+                  <div className="mt-2 bg-gray-50 dark:bg-[#3a3a3c]/60 rounded-2xl p-4 border border-gray-100 dark:border-[#3a3a3c]">
+                    <h4 className="text-[11px] font-bold text-gray-600 dark:text-zinc-400 uppercase tracking-wider mb-3 flex items-center">
                       <AlertCircle className="h-3.5 w-3.5 mr-1.5" />
                       {t.allergens}
                     </h4>
                     <div className="flex flex-wrap gap-2">
                       {selectedItem.allergens.map((alg) => (
-                        <span key={alg} className="bg-white dark:bg-[#2c2c2e] text-rose-900 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm flex items-center border border-rose-100">
+                        <span key={alg} className="bg-white dark:bg-[#2c2c2e] text-gray-800 dark:text-zinc-200 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm flex items-center border border-gray-200 dark:border-zinc-700">
                           <span className="mr-1.5 text-sm">{getAllergenIcon(alg)}</span> {alg}
                         </span>
                       ))}

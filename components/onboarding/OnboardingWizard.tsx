@@ -10,7 +10,7 @@ import { PanelThemeProvider, PanelBackground, ThemeToggle } from '@/components/t
 import { RestaurantProvider, useRestaurant } from '@/components/providers/RestaurantProvider'
 import { usePublicMenuPreview } from '@/lib/use-public-menu-preview'
 import { getBusinessType } from '@/lib/business-types'
-import { PRESET_MENU_TEMPLATES } from '@/lib/menu-templates'
+import { useCatalogTemplates } from '@/lib/use-catalog-templates'
 import {
   BasicsSection,
   BrandSection,
@@ -59,6 +59,10 @@ function Wizard() {
   const iframeRef = usePublicMenuPreview({ menu: null, restaurant: previewRestaurant, primaryColor: draft.primaryColor })
 
   const typeInfo = getBusinessType(draft.businessType)
+  const { templates: typeTemplates } = useCatalogTemplates(
+    draft.businessType || null,
+    stepIdx === STEPS.length - 1 && !!draft.businessType
+  )
   const canContinueBasics = draft.name.trim().length >= 2 && !!draft.businessType
 
   const persist = async (sections: Parameters<typeof draftToPatch>[1], nextStep: StepId | 'done') => {
@@ -118,7 +122,9 @@ function Wizard() {
     )
   }
 
-  const recommended = PRESET_MENU_TEMPLATES.find((t) => t.id === typeInfo?.templateId)
+  // Seçilen işletme tipine ait şablonlar (önerilen en başta)
+  const recommended = typeTemplates.find((t) => t.slug === typeInfo?.templateId) ?? typeTemplates[0]
+  const otherTemplates = typeTemplates.filter((t) => t.slug !== recommended?.slug)
   const menuUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/menu/${restaurant.subdomain}`
 
   return (
@@ -205,9 +211,9 @@ function Wizard() {
                       <MenuChoice
                         icon={<Sparkles className="h-6 w-6" />}
                         title={`${typeInfo?.icon ?? ''} ${recommended.name}`}
-                        desc="İşletme türüne uygun hazır menü; ürünleri ve fiyatları sonradan değiştirirsin."
+                        desc={`${recommended.itemCount} ürünlük hazır menü; ürünleri ve fiyatları sonradan değiştirirsin.`}
                         badge="Sana önerilen"
-                        onClick={() => finish('template', recommended.id)}
+                        onClick={() => finish('template', recommended.slug)}
                         disabled={busy}
                       />
                     ) : (
@@ -219,6 +225,16 @@ function Wizard() {
                         disabled={busy}
                       />
                     )}
+                    {otherTemplates.map((t) => (
+                      <MenuChoice
+                        key={t.slug}
+                        icon={<span className="text-xl leading-none">{t.icon}</span>}
+                        title={t.name}
+                        desc={`${t.tagline} · ${t.itemCount} ürün`}
+                        onClick={() => finish('template', t.slug)}
+                        disabled={busy}
+                      />
+                    ))}
                     <MenuChoice
                       icon={<Plus className="h-6 w-6" />}
                       title="Boş menüyle başla"

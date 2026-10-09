@@ -1,5 +1,4 @@
-import { Restaurant, Menu, UserAccount } from './types'
-import { PRESET_MENU_TEMPLATES } from './menu-templates'
+import { Restaurant, Menu, MenuCategory, UserAccount } from './types'
 
 // SİSTEM KULLANICI HESAPLARI
 export const SYSTEM_USERS: UserAccount[] = [
@@ -103,8 +102,19 @@ export const MOCK_RESTAURANTS: Restaurant[] = [
   }
 ]
 
-const ocakbasiTmpl = PRESET_MENU_TEMPLATES.find(t => t.id === 'geleneksel-ocakbasi-et') || PRESET_MENU_TEMPLATES[1]
-const cafeTmpl = PRESET_MENU_TEMPLATES.find(t => t.id === 'all-day-dining-bistro') || PRESET_MENU_TEMPLATES[0]
+// Demo menüleri: şablon içerikleri artık veritabanındaki katalogdan gelir (menu_templates).
+const ocakbasiTmpl = {
+  name: 'Kebapçı & Ocakbaşı Menüsü',
+  tagline: 'Mangal ateşinde Adana, Urfa ve karışık ızgara',
+  coverImage: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&h=400&fit=crop',
+  categories: [] as MenuCategory[],
+}
+const cafeTmpl = {
+  name: 'Kafe & Bistro Menüsü',
+  tagline: 'Gün boyu kahve, kahvaltı ve tatlı',
+  coverImage: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=800&h=400&fit=crop',
+  categories: [] as MenuCategory[],
+}
 
 export const mockMenusByRestaurant: Record<string, Menu[]> = {
   'lezzet-ocakbasi': [

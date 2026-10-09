@@ -183,3 +183,19 @@ html.dark.panel-active .keep-light.text-muted-foreground { color: rgb(107 114 12
 @media (prefers-reduced-motion: reduce) {
   .scan-attention, .scan-attention::after, .scan-attention svg { animation: none; }
 }
+
+/* Tema geçişi: View Transitions için varsayılan çapraz solmayı kapat, dairesel açılma JS ile yapılır */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 2; }
+
+/* View Transitions desteklenmeyen tarayıcılar için yumuşak renk geçişi */
+html.theme-fade *,
+html.theme-fade *::before,
+html.theme-fade *::after {
+  transition: background-color 0.5s ease, color 0.5s ease, border-color 0.5s ease !important;
+}

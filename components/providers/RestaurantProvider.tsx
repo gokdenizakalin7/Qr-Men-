@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { authFetch } from '@/lib/api-client'
+import { extractPrimaryBrandColorFromDataUrl } from '@/lib/extract-brand-color'
 import type { Restaurant } from '@/lib/types'
 
 export type ProfilePatch = Record<string, unknown>
@@ -105,9 +106,17 @@ export function RestaurantProvider({ children }: { children: React.ReactNode }) 
         persistLegacy(next)
         return next
       })
+      if (kind === 'logo' && restaurant) {
+        const primaryColor = await extractPrimaryBrandColorFromDataUrl(dataUrl)
+        try {
+          await save({ primaryColor })
+        } catch (err) {
+          console.warn('Logo rengi kaydedilemedi', err)
+        }
+      }
       return data.url as string
     },
-    [restaurant?.id]
+    [restaurant, save]
   )
 
   const removeAsset = useCallback(async (kind: 'logo' | 'cover') => {

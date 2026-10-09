@@ -43,7 +43,8 @@ import {
 } from 'lucide-react'
 import { Menu, MenuCategory, MenuItem, Restaurant } from '@/lib/types'
 import { getStoredMenus, setStoredMenus } from '@/lib/mock-data'
-import { PRESET_MENU_TEMPLATES, MenuTemplate } from '@/lib/menu-templates'
+import { useCatalogTemplates } from '@/lib/use-catalog-templates'
+import type { CatalogTemplateSummary } from '@/lib/catalog-templates'
 import { sanitizeText, sanitizeMultilineText, sanitizePrice } from '@/lib/sanitizer'
 import { ScanMenuModal } from '@/components/modals/ScanMenuModal'
 import { useRestaurant } from '@/components/providers/RestaurantProvider'
@@ -260,7 +261,12 @@ export function LiveMenuEditor() {
   }, [subdomain, menuIdParam])
 
   const [primaryColor, setPrimaryColor] = useState(currentRestaurant?.branding?.primaryColor || '#e11d48')
-  
+
+  useEffect(() => {
+    const c = currentRestaurant?.branding?.primaryColor
+    if (c) setPrimaryColor(c)
+  }, [currentRestaurant?.branding?.primaryColor])
+
   // Canlı Önizleme State'i
   const [previewCategory, setPreviewCategory] = useState<string>('all')
   const [previewSearch, setPreviewSearch] = useState<string>('')
@@ -402,68 +408,81 @@ export function LiveMenuEditor() {
     if (start === 'scan') setIsScanMenuModalOpen(true)
     else if (start === 'blank') handleCreateBlankMenu()
     else if (start === 'template') {
-      const tmpl = PRESET_MENU_TEMPLATES.find((t) => t.id === templateId)
-      if (tmpl) handleApplyTemplate(tmpl)
+      if (templateId) handleApplyTemplate({ slug: templateId })
       else setIsTemplateModalOpen(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, subdomain, searchParams, menu])
 
-  // Restoran türüne uygun şablon en başta gösterilir
+  // Şablonlar menu_templates tablosundan gelir; işletme tipine uyanlar ve önerilen en başta
+  const { templates: allTemplates, isLoading: templatesLoading } = useCatalogTemplates(null)
+  const [showAllTemplates, setShowAllTemplates] = useState(false)
+  const businessTypeId = currentRestaurant?.businessType
   const orderedTemplates = useMemo(() => {
-    const recommendedId = getBusinessType(currentRestaurant?.businessType)?.templateId
-    return [...PRESET_MENU_TEMPLATES].sort(
-      (a, b) => (b.id === recommendedId ? 1 : 0) - (a.id === recommendedId ? 1 : 0)
-    )
-  }, [currentRestaurant?.businessType])
+    const recommendedSlug = getBusinessType(businessTypeId)?.templateId
+    const rank = (t: CatalogTemplateSummary) =>
+      t.slug === recommendedSlug ? 2 : t.businessType === businessTypeId ? 1 : 0
+    return [...allTemplates].sort((a, b) => rank(b) - rank(a))
+  }, [allTemplates, businessTypeId])
+  const hasTypeMatches = orderedTemplates.some((t) => t.businessType === businessTypeId)
+  const visibleTemplates = useMemo(
+    () =>
+      showAllTemplates || !hasTypeMatches
+        ? orderedTemplates
+        : orderedTemplates.filter((t) => t.businessType === businessTypeId),
+    [orderedTemplates, showAllTemplates, hasTypeMatches, businessTypeId]
+  )
 
-  // HAZIR MENÜ ŞABLONUNU YÜKLE
-  const handleApplyTemplate = (tmpl: MenuTemplate) => {
+  // HAZIR MENÜ ŞABLONUNU YÜKLE (katalogdan kopyalama sunucuda apply_catalog_template RPC'siyle yapılır)
+  const [isApplyingTemplate, setIsApplyingTemplate] = useState(false)
+  const handleApplyTemplate = async (tmpl: Pick<CatalogTemplateSummary, 'slug'> & Partial<CatalogTemplateSummary>) => {
+    if (isApplyingTemplate) return
     if (menu && menu.categories && menu.categories.length > 0) {
       const confirmReplace = window.confirm(
-        `"${tmpl.name}" şablonunu yüklemek istediğinize emin misiniz? Mevcut menü kategorileriniz bu şablonla güncellenecektir (Daha sonra dilediğiniz gibi düzenleyebilirsiniz).`
+        `"${tmpl.name ?? 'Bu'}" şablonunu yüklemek istediğinize emin misiniz? Mevcut menü kategorileriniz bu şablonla değiştirilecektir (Daha sonra dilediğiniz gibi düzenleyebilirsiniz).`
       )
       if (!confirmReplace) return
     }
 
-    const clonedCategories: MenuCategory[] = JSON.parse(JSON.stringify(tmpl.categories))
-    const newMenu: Menu = {
-      id: menu?.id || `menu-${Date.now()}`,
-      name: `${tmpl.venueType} Menüsü`,
-      description: tmpl.tagline,
-      image_url: tmpl.coverImage,
-      is_listed: true,
-      available_days: [1, 2, 3, 4, 5, 6, 7],
-      layout: 'grid',
-      created_at: menu?.created_at || new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      categories: clonedCategories
-    }
-
-    setMenu(newMenu)
-    setStoredMenus(subdomain, [newMenu])
-    setPrimaryColor(tmpl.color)
-    setIsTemplateModalOpen(false)
-    
-    // Asenkron olarak veritabanına kaydet
-    authFetch('/api/menus/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subdomain, menus: [newMenu] })
-    }).then(async res => {
-      if (res.ok) {
-        await adoptServerIds(res, newMenu)
-        setSavedSuccess(true)
-        setTimeout(() => setSavedSuccess(false), 3000)
-        toast.success('Şablon başarıyla uygulandı ve kaydedildi.')
-      } else {
-        const err = await res.json()
-        toast.error(`Kaydetme hatası: ${err.error || 'Bilinmeyen hata'}`)
+    setIsApplyingTemplate(true)
+    try {
+      const applyRes = await authFetch('/api/templates/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subdomain,
+          templateSlug: tmpl.slug,
+          menuId: menu && !menu.id.startsWith('menu-') ? menu.id : null,
+        }),
+      })
+      const applied = await applyRes.json().catch(() => ({}))
+      if (!applyRes.ok) {
+        toast.error(`Şablon uygulanamadı: ${applied.error || 'Bilinmeyen hata'}`)
+        return
       }
-    }).catch(e => {
-      console.error('Failed to sync template menu to Supabase:', e)
+
+      const loadRes = await authFetch(`/api/menus/load?subdomain=${subdomain}`)
+      if (!loadRes.ok) throw new Error('Menü yeniden yüklenemedi')
+      const { menus: loadedMenus } = await loadRes.json()
+      const newMenu: Menu | undefined =
+        (loadedMenus || []).find((m: Menu) => m.id === applied.menu_id) || loadedMenus?.[0]
+      if (!newMenu) throw new Error('Menü bulunamadı')
+
+      setMenu(newMenu)
+      setLastSavedJson(JSON.stringify(newMenu))
+      setStoredMenus(subdomain, loadedMenus)
+      const color = tmpl.color ?? allTemplates.find((t) => t.slug === tmpl.slug)?.color
+      if (color) setPrimaryColor(color)
+      setIsTemplateModalOpen(false)
+      setSavedSuccess(true)
+      setTimeout(() => setSavedSuccess(false), 3000)
+      toast.success('Şablon başarıyla uygulandı ve kaydedildi.')
+    } catch (e: any) {
+      console.error('Failed to apply template:', e)
       toast.error(`Bağlantı hatası: ${e.message}`)
-    })
+    } finally {
+      setIsApplyingTemplate(false)
+    }
   }
 
   // SIFIRDAN BOŞ MENÜ OLUŞTUR
@@ -1085,9 +1104,9 @@ export function LiveMenuEditor() {
               Tek Tıkla Yükleyebileceğiniz Popüler Hazır Menü Paketleri:
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {orderedTemplates.slice(0, 4).map((tmpl) => (
+              {visibleTemplates.slice(0, 4).map((tmpl) => (
                 <div 
-                  key={tmpl.id}
+                  key={tmpl.slug}
                   onClick={() => handleApplyTemplate(tmpl)}
                   className="p-4 rounded-xl border border-gray-200 hover:border-primary hover:shadow-md transition-all cursor-pointer bg-gray-50/50 hover:bg-white flex items-center justify-between group"
                 >
@@ -1478,12 +1497,18 @@ export function LiveMenuEditor() {
 
           {/* Şablon Kartları Grid */}
           <div className="flex-1 overflow-y-auto py-4 pr-1 space-y-4 max-h-[520px] scrollbar-thin">
+            {templatesLoading && (
+              <p className="text-sm text-gray-500 text-center py-8">Şablonlar yükleniyor…</p>
+            )}
+            {!templatesLoading && visibleTemplates.length === 0 && (
+              <p className="text-sm text-gray-500 text-center py-8">Şu an kullanılabilir şablon yok.</p>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {PRESET_MENU_TEMPLATES.map((tmpl) => {
-                const totalItemCount = tmpl.categories.reduce((acc, cat) => acc + cat.items.length, 0)
+              {visibleTemplates.map((tmpl) => {
+                const totalItemCount = tmpl.itemCount
                 return (
                   <div
-                    key={tmpl.id}
+                    key={tmpl.slug}
                     className="bg-white rounded-2xl border-2 border-gray-200 hover:border-primary hover:shadow-md transition-all p-4 flex flex-col justify-between space-y-3 group"
                   >
                     <div className="space-y-2.5">
@@ -1512,8 +1537,8 @@ export function LiveMenuEditor() {
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Kategori Setleri:</span>
                         <div className="flex flex-wrap gap-1.5">
                           {tmpl.categories.map((c) => (
-                            <span key={c.id} className="text-[11px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md font-medium">
-                              {c.name} <strong className="text-primary font-bold">({c.items.length})</strong>
+                            <span key={c.name} className="text-[11px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md font-medium">
+                              {c.name} <strong className="text-primary font-bold">({c.itemCount})</strong>
                             </span>
                           ))}
                         </div>
@@ -1522,6 +1547,7 @@ export function LiveMenuEditor() {
 
                     <Button
                       onClick={() => handleApplyTemplate(tmpl)}
+                      disabled={isApplyingTemplate}
                       className="w-full text-xs h-9 bg-gray-900 hover:bg-primary text-white font-bold transition-colors flex items-center justify-center gap-1.5"
                     >
                       <CheckCircle2 className="h-3.5 w-3.5" /> Bu Şablonu Menüye Yükle
@@ -1534,6 +1560,11 @@ export function LiveMenuEditor() {
 
           <div className="pt-3 border-t flex items-center justify-between text-xs text-gray-500">
             <span>💡 İpucu: Şablon yüklendikten sonra ürün ekleyebilir, fiyatları değiştirebilir veya istemediğiniz kategorileri tek tıkla gizleyebilirsiniz.</span>
+            {hasTypeMatches && (
+              <Button variant="ghost" size="sm" onClick={() => setShowAllTemplates((v) => !v)}>
+                {showAllTemplates ? 'Yalnızca işletme türüme uyanlar' : 'Tüm şablonları göster'}
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => setIsTemplateModalOpen(false)}>
               Kapat
             </Button>

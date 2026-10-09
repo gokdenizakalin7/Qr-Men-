@@ -21,6 +21,8 @@ const categorySchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1),
   description: z.string().optional(),
+  parent_id: z.string().nullable().optional(),
+  icon: z.string().nullable().optional(),
   is_active: z.boolean().optional(),
   display_order: z.number().optional(),
   items: z.array(itemSchema).optional(),
